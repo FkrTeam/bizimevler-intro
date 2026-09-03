@@ -163,6 +163,23 @@ ul {
   background: var(--bg) var(--film-poster, none) center / cover no-repeat;
 }
 
+/* Wide cut: crop from the left, never the right.
+   `cover` has to trim something whenever the viewport is not exactly 1.92:1.
+   Taller-than-that viewports (16:9 and 16:10 laptops with browser chrome) lose
+   width, and where that width comes from is decided here. Measured on the
+   held frame: the leftmost marker starts 205px in from the left edge, the
+   rightmost ends 10px from the right. Centred, a 1600×900 window already cut
+   marker 9 off; anchored right, every window down to ~1.72:1 keeps both, and
+   the trim comes out of the empty ground on the left. The poster is anchored
+   the same way so the still and the first frame line up. Under the breakpoint
+   the portrait cut is framed for phones and stays centred. */
+@media (min-width: 720px) {
+  .film__video {
+    object-position: 100% 50%;
+    background-position: 100% 50%;
+  }
+}
+
 /* Just enough darkening at the two edges to keep the logo and the hint legible
    over any frame. The middle of the picture is left completely alone. */
 .film__scrim {

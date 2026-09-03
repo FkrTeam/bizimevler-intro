@@ -376,21 +376,63 @@ export function initScrollVideo({
 
     const attempt = video.play();
     if (attempt && typeof attempt.then === "function") {
-      attempt.catch(() => {
-        if (HOLD) {
-          settleOnLastFrame(true);
-          return;
-        }
-        phase = SCRUBBING;
-        handoffTime = duration;
-        handoffProgress = readProgress();
-        smoothed = duration;
-        if (duration > 0) video.currentTime = duration - FRAME;
-        removeEventListener("scroll", watchForHandover);
-        onScrubStart?.();
-        syncLoop();
-      });
+      attempt.catch(retryOnGesture);
     }
+  }
+
+  /* Autoplay was refused. That is not always final: iOS in Low Power Mode,
+     Android browsers with a data saver on, and a few desktop policies all
+     reject the first, gesture-less play() and accept the same call once the
+     visitor has touched the page. So the poster stays up and the first
+     gesture retries. A tap or a key is a gesture; so is the touchend at the
+     end of a swipe — and if that swipe already scrolled past the intro, the
+     skip handlers have settled things and the retry steps aside. Only when
+     the retry is refused too do we park at the end as before. */
+
+  const GESTURE_EVENTS = ["pointerup", "touchend", "keydown"];
+  let gestureRetryArmed = false;
+
+  function retryOnGesture() {
+    if (gestureRetryArmed) return;
+    gestureRetryArmed = true;
+    for (const type of GESTURE_EVENTS) {
+      addEventListener(type, onFirstGesture, { capture: true, passive: true });
+    }
+  }
+
+  function disarmGestureRetry() {
+    if (!gestureRetryArmed) return;
+    gestureRetryArmed = false;
+    for (const type of GESTURE_EVENTS) {
+      removeEventListener(type, onFirstGesture, { capture: true });
+    }
+  }
+
+  function onFirstGesture() {
+    disarmGestureRetry();
+    if (HOLD && introSettled) return;
+    if (REWIND && phase !== PLAYING) return;
+
+    const attempt = video.play();
+    if (attempt && typeof attempt.then === "function") {
+      attempt.catch(parkAtEnd);
+    }
+  }
+
+  function parkAtEnd() {
+    if (HOLD) {
+      settleOnLastFrame(true);
+      return;
+    }
+    if (phase !== PLAYING) return;
+    phase = SCRUBBING;
+    handoffTime = duration;
+    handoffProgress = readProgress();
+    smoothed = duration;
+    if (duration > 0) video.currentTime = duration - FRAME;
+    removeEventListener("scroll", watchForHandover);
+    onScrubStart?.();
+    syncLoop();
   }
 
   /* ---- Target ------------------------------------------------------------ */
@@ -508,14 +550,33 @@ export function initScrollVideo({
   );
   observer.observe(section);
 
-  document.addEventListener("visibilitychange", syncLoop);
+  /* Chromium pauses video-only media in a background tab "to save power" and
+     rejects the play() that was in flight — which is exactly what a link
+     opened from a chat app into a background tab looks like. Coming back to
+     the tab is not a gesture, but muted playback needs none, so try again
+     right then; otherwise the visitor is left on the poster until they touch
+     the page. Only while the intro is still the thing that should be running. */
+  function onVisibilityChange() {
+    syncLoop();
+    if (document.visibilityState !== "visible") return;
+    const introPending = (REWIND && phase === PLAYING) || (HOLD && !introSettled);
+    if (introPending && onScreen && video.paused && !video.ended) {
+      const attempt = video.play();
+      if (attempt && typeof attempt.then === "function") {
+        attempt.catch(retryOnGesture);
+      }
+    }
+  }
+
+  document.addEventListener("visibilitychange", onVisibilityChange);
 
   function destroy() {
     cancelAnimationFrame(rafId);
     observer.disconnect();
+    disarmGestureRetry();
     removeEventListener("scroll", watchForHandover);
     removeEventListener("scroll", watchForSkip);
-    document.removeEventListener("visibilitychange", syncLoop);
+    document.removeEventListener("visibilitychange", onVisibilityChange);
     video.removeEventListener("seeked", markSettled);
     video.removeEventListener("ended", beginScrub);
     video.removeEventListener("ended", onIntroEnded);

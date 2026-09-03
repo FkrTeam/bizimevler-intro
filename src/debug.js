@@ -67,6 +67,51 @@ export function initDebug(video) {
     seekStart = 0;
   });
 
+  /* "It does not play" has as many causes as "it stutters": the element never
+     got a byte (network), got bytes it cannot decode (error), or decoded fine
+     and was refused autoplay (paused at 0, no error). The last media event
+     and the error code tell them apart from a screenshot. */
+  const MEDIA_EVENTS = [
+    "loadstart", "loadedmetadata", "loadeddata", "canplay", "canplaythrough",
+    "play", "playing", "pause", "waiting", "stalled", "suspend", "abort",
+    "emptied", "error", "ended",
+  ];
+  let lastEvent = "-";
+  let eventCount = 0;
+  const t0 = performance.now();
+  const log = [];
+  function note(what) {
+    lastEvent = what;
+    eventCount++;
+    log.push(`${((performance.now() - t0) / 1000).toFixed(2)}s ${what}`);
+    if (log.length > 12) log.shift();
+  }
+  for (const type of MEDIA_EVENTS) {
+    video.addEventListener(type, () => note(type));
+  }
+
+  // play() is where autoplay policy shows up: a refusal is a rejected promise,
+  // not an event. Wrapped on the instance, so the player's own calls are seen.
+  const nativePlay = video.play;
+  video.play = function play() {
+    note("play() called");
+    const p = nativePlay.apply(this, arguments);
+    if (p && typeof p.then === "function") {
+      p.then(
+        () => note("play() ok"),
+        (e) => note(`play() REJECTED ${e?.name ?? ""} ${e?.message ?? ""}`.trim())
+      );
+    }
+    return p;
+  };
+
+  function errorLine() {
+    const e = video.error;
+    if (!e) return "-";
+    const names = ["", "ABORTED", "NETWORK", "DECODE", "SRC_NOT_SUPPORTED"];
+    return `${e.code} ${names[e.code] ?? ""} ${e.message ?? ""}`.trim();
+  }
+
   function bufferedPercent() {
     const r = video.buffered;
     if (!r || r.length === 0 || !video.duration) return 0;
@@ -95,6 +140,17 @@ export function initDebug(video) {
         `seeks        ${seekCount}`,
         `buffered     ${bufferedPercent().toFixed(0)} %`,
         `readyState   ${video.readyState}`,
+        `network      ${video.networkState}`,
+        `state        ${video.paused ? "paused" : "playing"}${video.ended ? " ended" : ""} @ ${video.currentTime.toFixed(2)}s`,
+        `last event   ${lastEvent} (${eventCount})`,
+        `error        ${errorLine()}`,
+        `src          ${video.currentSrc.split("/").pop() || "-"}`,
+        `viewport     ${innerWidth}×${innerHeight}`,
+        `ua           ${navigator.userAgent.slice(0, 60)}`,
+        `activation   ${navigator.userActivation?.hasBeenActive ?? "?"}`,
+        `visibility   ${document.visibilityState}`,
+        "--- events ---",
+        ...log,
       ].join("\n");
 
       worstFrameGap = 0;

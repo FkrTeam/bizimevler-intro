@@ -498,6 +498,14 @@ verir ama sayılar ayırır:
 | fps normal, seek süreleri yüksek (>50 ms) | Decode — GOP uzun, çözünürlük yüksek |
 | buffered %100'ün altındayken sıçramalar | Ağ / inmemiş veriye seek |
 
+Panel "oynamıyor" şikâyetini de ayırır: `state`, `last event`, `error` ve
+alttaki olay günlüğü. `play() REJECTED NotAllowedError` → otomatik oynatma
+politikası (iOS Düşük Güç Modu, veri tasarrufu); oynatıcı bu durumda posteri
+tutar ve ilk dokunuşta yeniden dener. `play() REJECTED AbortError ... background
+media was paused` → sayfa arka planda açıldı; sekme görünür olunca yeniden
+denenir. `error 3 DECODE` / `4 SRC_NOT_SUPPORTED` → kodek veya sunucu (byte-range
+yoksa Safari burada düşer). `network 3` → dosya hiç gelmedi.
+
 `?noblur` ile kartların backdrop blur'ünü kapatabilirsiniz. Birleştirin:
 `?debug&noblur`.
 
