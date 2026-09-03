@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Raw / working media (large source assets, not needed by the site)
+_source/
+/be*.mp4
+/be*.jpg
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log

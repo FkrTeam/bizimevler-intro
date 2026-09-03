@@ -1,0 +1,831 @@
+@import "./tokens.css";
+
+/* =============================================================
+   Reset
+   ============================================================= */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+body {
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--step-0);
+  line-height: var(--leading-body);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip;
+}
+
+/* =============================================================
+   Scrollbar — hidden
+
+   The section is 200dvh, so the platform bar is always there, and on Windows
+   it lands as a wide light slab down the right edge of a dark grade: the
+   brightest thing on screen during a shot meant to hold the eye. The page
+   reports position through the progress rule at the foot of the frame
+   instead, so the bar is painting a second answer to a question already
+   answered — and doing it in the platform's visual language rather than this
+   one's.
+
+   Visual only. Nothing here touches `overflow`, so the wheel, the space bar,
+   the arrow keys, Page Up/Down, Home/End, a trackpad and a touch drag all
+   behave exactly as before — this hides the indicator, it does not remove the
+   scrolling. What it does cost is the two things the bar alone could do:
+   reading off how much page is left at a glance, and dragging the thumb to
+   jump. The runway is one screen of travel and the sequence is meant to be
+   moved through rather than skipped, which is what makes that an acceptable
+   price here and not a general one.
+
+   Both declarations are needed and they do not conflict — they are the same
+   instruction to two eras of engine. Chromium ignores every
+   ::-webkit-scrollbar rule once it sees `scrollbar-width`, but since that
+   property is already hiding the bar, the outcome is identical either way.
+   ============================================================= */
+
+html {
+  /* Firefox, and Chromium 121+ */
+  scrollbar-width: none;
+}
+
+/* WebKit, and Chromium before it honoured the standard property */
+html::-webkit-scrollbar {
+  display: none;
+}
+
+video {
+  display: block;
+  max-width: 100%;
+}
+
+h1,
+h2,
+h3 {
+  line-height: var(--leading-tight);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  font-weight: 620;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+a {
+  color: inherit;
+}
+
+ul {
+  list-style: none;
+  padding: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+.skip-link {
+  position: fixed;
+  top: var(--space-xs);
+  left: var(--space-xs);
+  z-index: 100;
+  padding: var(--space-xs) var(--space-md);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  transform: translateY(-150%);
+  transition: transform var(--dur-micro) var(--ease-out);
+}
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+/* =============================================================
+   Film — autoplay, then the content arrives over the held frame
+   ============================================================= */
+
+.film {
+  position: relative;
+  /* Injected as a token at build time from template.config.js: either
+     scroll.runway outright, or duration × scroll.runwayPerSecond when scroll
+     drives the timeline — scaling it with the clip is what keeps the scrub
+     feeling the same across projects, since a fixed number makes a short clip
+     drag and a long one race. */
+  height: var(--film-runway, 400dvh);
+}
+
+.film__sticky {
+  position: sticky;
+  top: 0;
+  /* lvh, not dvh. `dvh` tracks the viewport as a mobile browser hides its
+     address bar on the first scroll, which means the pinned box is being
+     resized during the very gesture that is driving the sequence: the section
+     changes height, `readProgress()`'s divisor changes with it, and the whole
+     thing lurches. Worse, the resize lands a frame behind the scroll, which is
+     the band of empty background visible along the bottom edge mid-transition.
+
+     `lvh` is the viewport with the chrome retracted — a fixed number that the
+     bar appearing or disappearing cannot touch. While the bar is still up the
+     box overflows by its height, which costs nothing here: the video is
+     `object-fit: cover` and the composition is centred, so the overflow is
+     bled off the bottom rather than cropping anything that matters. */
+  height: 100vh; /* floor for engines without lvh; already ≈lvh on mobile */
+  height: 100lvh;
+  overflow: hidden;
+}
+
+.film__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  aspect-ratio: var(--film-aspect, 16 / 9);
+  /* The poster is painted here rather than through the element's `poster`
+     attribute, which takes a single file — and the portrait cut is framed
+     differently enough that the wide poster over it would be the wrong
+     picture, not just a cropped one. Both URLs arrive as --film-poster, the
+     portrait one under the breakpoint, so this rule needs no media query of
+     its own. `cover` matches object-fit above, so the still and the first
+     decoded frame occupy exactly the same box and the handover is invisible. */
+  background: var(--bg) var(--film-poster, none) center / cover no-repeat;
+}
+
+/* Just enough darkening at the two edges to keep the logo and the hint legible
+   over any frame. The middle of the picture is left completely alone. */
+.film__scrim {
+  z-index: 1;
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--bg) 55%, transparent) 0%,
+      transparent 22%
+    ),
+    /* Deeper and reaching higher than the top edge needs to. The prompt and
+       the progress bar both live down here, and the footage under them is
+       often bright daylight city — the earlier falloff left them stranded. */
+    linear-gradient(
+      to top,
+      color-mix(in srgb, var(--bg) 82%, transparent) 0%,
+      color-mix(in srgb, var(--bg) 34%, transparent) 15%,
+      transparent 36%
+    );
+}
+
+.film__logo {
+  position: absolute;
+  z-index: 3; /* stays above the card overlay */
+  inset-block-start: clamp(var(--space-lg), 4vh, var(--space-xl));
+  inset-inline-start: 50%;
+  translate: -50% 0;
+  /* Source is 200px wide. Anything past ~160 visibly softens the wordmark on
+     a 2x display — a larger PNG or an SVG would be needed to go bigger. */
+  width: clamp(130px, 16vw, 160px);
+  height: auto;
+  filter: drop-shadow(0 2px 14px rgb(0 0 0 / 0.5));
+  /* Clears out as the cards arrive — they carry their own logos, and this one
+     occupies exactly the space the headline needs. */
+  opacity: calc(1 - var(--cards-reveal, 0));
+}
+
+.film__prompt {
+  position: absolute;
+  z-index: 2;
+  /* Raised off the floor to leave the progress rule its own air. The two now
+     read as one vertical arrangement — text, descending line, then the rule it
+     points at — rather than two things that happen to share an edge. */
+  inset-block-end: clamp(2.6rem, 7vh, 4rem);
+  inset-inline-start: 50%;
+  translate: -50% 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin: 0;
+  white-space: nowrap;
+  /* Own stacking context so the backing glow can sit behind the type without
+     falling behind the video. */
+  isolation: isolate;
+}
+
+/* Legibility without chrome. A pill would guarantee contrast and announce
+   itself doing so; a soft radial darkening does the same job and reads as
+   part of the photograph's own falloff. */
+.film__prompt::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset-inline-start: 50%;
+  inset-block: -3.25rem -2.5rem;
+  width: 32rem;
+  translate: -50% 0;
+  pointer-events: none;
+  /* Wider and softer than it was. At 0.66 over a 70% stop the falloff was
+     tight enough to read as a smudge behind the type; spreading it out and
+     easing it off in two steps keeps the same legibility while looking like
+     the photograph's own vignette. */
+  background: radial-gradient(
+    ellipse 52% 58% at 50% 50%,
+    rgb(0 0 0 / 0.52),
+    rgb(0 0 0 / 0.22) 45%,
+    transparent 76%
+  );
+}
+
+.film__prompt-text {
+  font-family: var(--font-mono);
+  /* Smaller and more widely tracked than before. At 0.95rem the line was
+     asserting itself like a heading; the register this page is written in
+     wants it to read as a caption — the smaller it gets, the more the
+     tracking does the work of making it deliberate. */
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.34em;
+  /* Tracking adds a trailing space after the final letter, which throws
+     centred text visibly left. Indenting by one tracking unit puts the
+     optical centre back where the geometric one is. */
+  text-indent: 0.34em;
+  text-transform: uppercase;
+  /* Not pure white. Against a dark grade, #fff is the one value that reads as
+     interface rather than as part of the photograph. */
+  color: rgb(255 255 255 / 0.9);
+  /* Three shadows at increasing radius. A single blur either stays too tight
+     to separate the type from busy footage or goes so wide it turns into a
+     grey smudge; stacking a hard edge, a mid halo and a wide fall-off holds
+     the letterforms over a bright daylight cityscape without reading as a
+     box behind them. */
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.9), 0 2px 14px rgb(0 0 0 / 0.85),
+    0 6px 34px rgb(0 0 0 / 0.6);
+}
+
+/* A fixed hairline track with a lit segment descending inside it. The whole
+   line bouncing is the stock gesture; a travelling segment says the same
+   thing without the element itself moving.
+
+   The track then does a second job: once the visitor starts scrolling, the
+   travelling segment hands over to a fill that descends the same track in step
+   with them. The hint does not just disappear when it has been understood — it
+   becomes the answer to itself, which is why the fill runs to the bottom of the
+   track exactly as the hint finishes fading out. */
+.film__prompt-line {
+  position: relative;
+  /* 2px, not 1. A hairline disappears entirely against a detailed frame. */
+  width: 2px;
+  height: 88px;
+  overflow: hidden;
+  /* Quieter than it was: at 0.4 the empty track competed with the lit segment
+     travelling inside it, which is the one thing meant to be moving. */
+  background: rgb(255 255 255 / 0.26);
+  box-shadow: 0 0 10px rgb(0 0 0 / 0.55);
+}
+
+.film__prompt-line::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 0;
+  height: 26px;
+  /* Gradient ends rather than a hard block. A rectangle sliding down a groove
+     reads as a UI part; a gradient reads as light moving along the line — and
+     it makes the keyframes' opacity fades unnecessary, which is what frees
+     `opacity` below to carry the handover instead. */
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--brand-yellow) 38%,
+    var(--brand-yellow) 62%,
+    transparent
+  );
+  box-shadow: 0 0 12px color-mix(in srgb, var(--brand-yellow) 55%, transparent);
+  /* Out of the way almost immediately once scrolling starts — by ~8% of the
+     section the fill has taken the track over, and two things moving in the
+     same 2px groove would read as a glitch. */
+  opacity: clamp(0, calc(1 - var(--film-progress, 0) * 12), 1);
+  animation: prompt-travel 2.8s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+/* The scroll's own position, descending the same track the hint just left.
+   Divided by the span the prompt lives over, so it reaches the bottom of the
+   track at the moment the prompt finishes fading — the gesture and its
+   indicator retire together instead of one outliving the other. */
+.film__prompt-fill {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 0;
+  height: 100%;
+  background: rgb(255 255 255 / 0.88);
+  transform-origin: top center;
+  transform: scaleY(
+    min(1, calc(var(--film-progress, 0) / var(--film-prompt-span, 0.46)))
+  );
+  /* Matches the progress rule's transition, so the two indicators move as one
+     mechanism rather than at two slightly different rates. */
+  transition: transform 110ms linear;
+}
+
+@keyframes prompt-travel {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(400%);
+  }
+}
+
+/* Was a 3px bar spanning the full width along the very bottom edge. Nothing
+   about it was wrong mechanically, but a bright line ruled across the foot of
+   a cinematic frame cuts the picture in two and is the most template-looking
+   thing on the page. Centred, narrow and reduced to a hairline, it stops being
+   a border and becomes part of the arrangement the prompt sits at the top of —
+   closer to the scale bar on an architectural drawing than to a reading
+   indicator. */
+.film__progress {
+  position: absolute;
+  inset-block-end: clamp(1rem, 2.6vh, 1.6rem);
+  inset-inline-start: 50%;
+  translate: -50% 0;
+  width: min(58vw, 440px);
+  height: 1px;
+  background: color-mix(in srgb, var(--text) 18%, transparent);
+  /* Both ends dissolve instead of stopping. A rule with hard ends declares its
+     own length, which invites reading it as a measurement of something; fading
+     out lets it belong to the frame. The fill inherits the mask, so it emerges
+     rather than snapping into view. */
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 7%,
+    #000 93%,
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 7%,
+    #000 93%,
+    transparent
+  );
+}
+
+/* Marks every tenth, hung under the rule rather than crossing it. This is what
+   separates a drawn instrument from a plain line, and it is the detail the
+   comment above is actually describing — a scale bar is graduated or it is just
+   a rule. Kept deliberately below the track's own contrast: they should be
+   found on a second look, not counted on the first. Delete this one block to go
+   back to an ungraduated line; nothing else depends on it. */
+.film__progress::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 100%;
+  height: 3px;
+  background: repeating-linear-gradient(
+    to right,
+    color-mix(in srgb, var(--text) 13%, transparent) 0 1px,
+    transparent 1px 10%
+  );
+}
+
+.film__progress span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--progress);
+  /* At 1px the fill needs the bloom to stay visible over daylight footage — and
+     the glow is what keeps the rule reading as lit rather than drawn. Off
+     --progress, not the raw brand yellow: the fill above already comes from
+     that token, and a glow keyed to a different one would silently stop
+     matching the moment the token is repointed. */
+  box-shadow: 0 0 8px color-mix(in srgb, var(--progress) 55%, transparent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  /* During playback the bar is driven by presented video frames — 30 updates
+     a second against a 60Hz+ display. A short linear transition lets the
+     compositor interpolate the gaps, so the fill reads as continuous motion
+     rather than 30 discrete steps. Linear, because any easing would fight the
+     constant rate the bar is actually moving at. */
+  transition: transform 110ms linear;
+}
+
+/* =============================================================
+   Project cards — overlaid on the held frame
+   ============================================================= */
+
+.film__cards {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: clamp(var(--space-lg), 4vh, var(--space-xl)) var(--space-lg);
+  /* No nested scroller. The whole composition is sized to fit one screen; if
+     it ever cannot, letting it scroll inside a pinned section would fight the
+     page scroll that is driving the video. */
+  overflow: hidden;
+  /* Its own scrim, so the video reads as a backdrop rather than competing
+     with the copy. Fades in with the cards because it rides their opacity. */
+  background: color-mix(in srgb, var(--bg) 74%, transparent);
+  /* Never intercept clicks while invisible — .is-interactive re-enables it */
+  pointer-events: none;
+}
+
+/* The blur is deliberately NOT on the base rule. A full-viewport
+   backdrop-filter is one of the most expensive things a page can carry, and
+   there it would exist from first paint — through the whole autoplay and
+   rewind — competing with the decoder while contributing nothing, since the
+   layer is transparent until the rewind ends. Attaching it to the state where
+   the cards are actually readable defers the cost to the one moment the video
+   has stopped moving. */
+.film__cards.is-interactive {
+  pointer-events: auto;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+/* ?noblur — isolation switch, see main.js */
+.no-blur .film__cards.is-interactive {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* Phones do not get the blur at all.
+   The comment above defers the cost to the moment the video stops moving,
+   which is the right call on a desktop GPU — but on a phone that moment is
+   precisely when three cards are sliding in over a full-viewport layer, and a
+   full-viewport backdrop-filter is the most expensive thing on this page. The
+   result was visible in the capture: while the cards travel, the frame-to-
+   frame deltas go ragged instead of even, which is dropped frames.
+
+   The blur was only ever buying separation between the copy and the footage.
+   A more opaque backing buys the same separation for nothing, so that is the
+   trade taken here — and it composites, so the reveal stays on the GPU. */
+@media (max-width: 719px) {
+  .film__cards.is-interactive {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .film__cards {
+    background: color-mix(in srgb, var(--bg) 90%, transparent);
+  }
+}
+
+.film__cards-inner {
+  width: 100%;
+  max-width: 68rem;
+}
+
+/* The slogan carries the section on its own now that the eyebrow is gone, so
+   it is set larger and tighter than a normal heading. */
+.film__cards-title {
+  font-size: clamp(2rem, 1.4rem + 2.6vw, 3.6rem);
+  font-weight: 680;
+  letter-spacing: -0.03em;
+  margin-bottom: clamp(var(--space-xl), 5vh, 3.25rem);
+}
+
+.cards {
+  display: grid;
+  gap: var(--space-lg);
+}
+
+@media (min-width: 720px) {
+  .cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Deliberately spare. The tells that make a card look machine-assembled are
+   all additive: a big corner radius, a pill badge, an icon beside every label,
+   a "Detaylı bilgi →" row, a lift-and-glow hover. Each was removed rather than
+   restyled. What is left is the photograph, the project's own logo plate, one
+   line of small-caps metadata, and a rule that draws itself on hover. */
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--surface);
+  /* 2px, not 20. Sharp corners read as architectural; heavily rounded reads
+     as a generic web card. */
+  border-radius: 2px;
+  overflow: hidden;
+  text-decoration: none;
+  outline: 1px solid var(--border);
+  outline-offset: -1px;
+  transition: outline-color 320ms var(--ease-out);
+}
+
+.card:hover {
+  outline-color: rgb(255 255 255 / 0.22);
+}
+
+.card:focus-visible {
+  outline: 2px solid var(--brand-yellow);
+  outline-offset: 2px;
+}
+
+/* ---- Photograph ---- */
+
+.card__photo {
+  display: block;
+  width: 100%;
+  /* height:auto is load-bearing. The width/height attributes on <img> are
+     presentation hints that set the CSS height property, and a used height
+     beats aspect-ratio — without this the three photos render at their own
+     intrinsic heights (588px vs 450px) and the cards stop matching. */
+  height: auto;
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+  /* Architectural renders put the subject above the horizon; favouring the
+     upper half keeps towers in frame instead of paving. */
+  object-position: 50% 38%;
+  background: var(--surface-2);
+  /* Slow, small push-in. Anything faster reads as a UI effect rather than
+     the image breathing. */
+  transition: transform 900ms var(--ease-out);
+}
+
+.card:hover .card__photo {
+  transform: scale(1.035);
+}
+
+/* ---- Caption ---- */
+
+.card__content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  flex: 1;
+  padding: var(--space-md) var(--space-lg) var(--space-lg);
+}
+
+.card__title {
+  margin: 0;
+}
+
+.card__logo {
+  display: block;
+  width: 118px;
+  height: auto;
+  /* The plate is already a solid blue rectangle — it needs no frame, only
+     enough separation from the surface behind it. */
+  box-shadow: 0 4px 14px -6px rgb(0 0 0 / 0.9);
+}
+
+/* One line, mono, widely tracked — the register architectural practices use
+   for project data. No icons: a pin beside the word "Ispartakule" tells the
+   reader nothing they did not already know. */
+.card__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.7em;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--text) 62%, transparent);
+}
+
+.card__sep {
+  width: 1px;
+  height: 10px;
+  background: currentColor;
+  opacity: 0.4;
+}
+
+.card__status--ready {
+  color: var(--status-ready);
+}
+
+.card__status--new {
+  color: var(--brand-yellow);
+}
+
+/* The single moving part. Draws itself across the foot of the card on hover —
+   a directional cue that does not need an arrow glyph to say "go". */
+.card__rule {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
+  height: 2px;
+  background: var(--brand-yellow);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 420ms var(--ease-out);
+}
+
+.card:hover .card__rule,
+.card:focus-visible .card__rule {
+  transform: scaleX(1);
+}
+
+/* ---- Fitting one screen -------------------------------------------------
+   The section is pinned, so the composition has exactly 100dvh to live in.
+   Two places it would otherwise overflow:
+--------------------------------------------------------------------------- */
+
+/* Narrow: three stacked portrait cards cannot fit a phone screen, so the card
+   turns on its side. Same parts, laid horizontally. */
+@media (max-width: 719px) {
+  .card {
+    flex-direction: row;
+  }
+
+  .card__photo {
+    flex: none;
+    width: 38%;
+    aspect-ratio: 1 / 1;
+  }
+
+  .card__content {
+    flex: 1;
+    justify-content: center;
+    gap: 0.55rem;
+    padding: var(--space-md);
+  }
+
+  .card__logo {
+    width: 96px;
+  }
+}
+
+/* Short: laptops in the 600-700px-tall range, and phones in landscape. */
+@media (max-height: 680px) {
+  .film__cards-title {
+    font-size: clamp(1.4rem, 3.4vw, 2.1rem);
+    margin-bottom: var(--space-md);
+  }
+
+  .card__photo {
+    aspect-ratio: 16 / 9;
+  }
+
+  .card__content {
+    gap: 0.55rem;
+    padding: var(--space-sm) var(--space-md) var(--space-md);
+  }
+
+  .card__logo {
+    width: 100px;
+  }
+}
+
+/* =============================================================
+   Reveal states
+
+   Visible by default. The hidden start only exists under .js-anim, which the
+   inline head script adds when motion is allowed.
+   ============================================================= */
+
+.js-anim .film__cards {
+  opacity: var(--cards-reveal, 0);
+}
+
+/* The composition arrives sideways while the scroll that drives it stays
+   vertical. The split is the whole point: the visitor keeps the gesture every
+   page already has — wheel, space bar, arrow keys, a thumb swipe — and the
+   scene answers it by moving horizontally. Nothing is hijacked to get there,
+   so the keyboard, the scrollbar and mobile all behave exactly as before.
+
+   Note the scroll hint below is deliberately NOT rotated to match. It
+   describes the visitor's gesture, not the animation, and that gesture is
+   still downward; an arrow pointing right would be instructing them to do
+   something that does nothing.
+
+   Travel is longer than the vertical rise it replaces. Sideways movement
+   reads as slower at the same distance, and unlike height — which is fighting
+   for a fixed 100dvh — the row has the width to spend. */
+.js-anim .film__cards-title {
+  transform: translateX(calc((1 - var(--cards-reveal, 0)) * 34px));
+}
+
+/* Staggered slide driven entirely by the single --cards-reveal value: each card
+   just starts from a different distance, so CSS produces the wave without
+   three separate per-frame style writes from JS. Entering from the trailing
+   edge means the row settles left to right, following the reading direction
+   and the progress bar underneath it. */
+.js-anim .film__cards li {
+  transform: translateX(calc((1 - var(--cards-reveal, 0)) * var(--card-slide)));
+}
+
+.js-anim .film__cards li:nth-child(1) {
+  --card-slide: 52px;
+}
+.js-anim .film__cards li:nth-child(2) {
+  --card-slide: 84px;
+}
+.js-anim .film__cards li:nth-child(3) {
+  --card-slide: 116px;
+}
+
+/* The scroll hint follows the same rule: present in the markup, hidden only
+   once JS is confirmed running, then revealed when the scrub phase begins.
+
+   --prompt-fade is written per frame from scroll position, so the fade-out
+   near the bottom of the section — and its return on the way back up — is a
+   pure function of where the page is, not a one-shot event. The transition is
+   short enough that per-frame updates trail imperceptibly, while still giving
+   the initial appearance a proper fade. */
+.js-anim .film__prompt {
+  opacity: 0;
+  transform: translateY(10px);
+  /* Short on purpose. This transition exists for the one-off appearance at the
+     start of the scrub; --prompt-fade then changes every frame from scroll
+     position, and anything longer would visibly trail the scrollbar on the way
+     back up. */
+  transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
+}
+
+.js-anim .film__prompt.is-active {
+  opacity: var(--prompt-fade, 1);
+  transform: none;
+}
+
+/* =============================================================
+   Reduced motion
+   ============================================================= */
+
+@media (prefers-reduced-motion: reduce) {
+  /* No autoplay and no scrubbing happen, so the tall runway would be dead
+     scroll. Collapse it to a single readable screen. */
+  .film {
+    height: auto;
+  }
+  .film__sticky {
+    position: static;
+    height: auto;
+    min-height: 70dvh;
+  }
+  .film__progress {
+    display: none;
+  }
+  /* Static section, so anchor the logo and hint in flow instead of pinning
+     them to a viewport-height box that no longer exists. */
+  .film__logo {
+    position: static;
+    translate: none;
+    margin: var(--space-xl) auto 0;
+  }
+  .film__prompt {
+    position: static;
+    margin: var(--space-xl) auto 0;
+  }
+  /* The segment stops travelling, so park it mid-track where it still reads
+     as a downward marker rather than vanishing at opacity 0. */
+  .film__prompt-line::after {
+    animation: none;
+    opacity: 1;
+    transform: translateY(140%);
+  }
+  /* Nothing drives --film-progress here — the scrub loop never runs and the
+     one reveal call passes 1 — so the fill would sit permanently full behind
+     the parked marker, reading as a finished progress bar on a page that has
+     no progress to report. */
+  .film__prompt-fill {
+    display: none;
+  }
+  /* Nothing is pinned, so the cards stack below the video instead of covering
+     it — an overlay on a static box would sit on top of the poster forever. */
+  .film__cards {
+    position: static;
+    padding: var(--space-3xl) var(--space-lg);
+    background: var(--bg);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    overflow: visible;
+    pointer-events: auto;
+    opacity: 1;
+  }
+  /* Prefixed with .js-anim to match the specificity of the rules being undone.
+     Without it these are (0,1,1) against the reveal's (0,2,1) and lose on
+     specificity no matter how far down the file they sit. It only shows up
+     when the motion preference is turned on *after* load — .js-anim is never
+     added when it was already on — but a reset that cannot win is worse than
+     no reset, because it reads as covered. */
+  .js-anim .film__cards li,
+  .js-anim .film__cards-title {
+    transform: none;
+  }
+  .card:hover .card__photo {
+    transform: none;
+  }
+  .card__rule {
+    transform: scaleX(1);
+  }
+}

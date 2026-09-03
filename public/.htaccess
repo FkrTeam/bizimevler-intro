@@ -1,0 +1,88 @@
+# Apache — copied to dist/ by Vite. This is the live target (cPanel / shared
+# hosting); the Netlify + Cloudflare Pages equivalent lives in deploy/_headers
+# and the nginx one in deploy/nginx.conf, kept out of public/ so they are not
+# shipped alongside this one.
+
+# ---- HTTPS --------------------------------------------------------------
+# Left commented ON PURPOSE. cPanel's AutoSSL usually installs a redirect of
+# its own, and a second one here is how you get a redirect loop that is
+# painful to diagnose from the outside. Load the site over plain http:// after
+# deploying: if it does NOT land on https://, uncomment this block.
+#
+# <IfModule mod_rewrite.c>
+#   RewriteEngine On
+#   RewriteCond %{HTTPS} !=on
+#   RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# </IfModule>
+
+# ---- Byte-range requests ----------------------------------------------------
+# Required for seeking. Apache serves ranges by default; the usual way it gets
+# broken is a filter (DEFLATE) applied to video.
+<IfModule mod_headers.c>
+  Header set Accept-Ranges "bytes"
+</IfModule>
+
+# ---- MIME -------------------------------------------------------------------
+<IfModule mod_mime.c>
+  AddType video/mp4 .mp4
+  # Older shared hosting still ships without these. Served as
+  # application/octet-stream, a .webp simply does not render and a .mp4 will
+  # not seek — both fail silently with no console error.
+  AddType image/webp .webp
+  AddType image/avif .avif
+</IfModule>
+
+# ---- Compression ------------------------------------------------------------
+# Text only. Compressing MP4 wastes CPU and disables range requests.
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/css \
+    text/javascript application/javascript application/json image/svg+xml
+  SetEnvIfNoCase Request_URI \.mp4$ no-gzip dont-vary
+</IfModule>
+
+# ---- Caching ----------------------------------------------------------------
+<IfModule mod_headers.c>
+  # Hashed build output — safe forever
+  <FilesMatch "\.(js|css)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+
+  # Images and fonts out of assets/ are hashed too (logo-yqqE5poL.png), so they
+  # belong in the same bucket. Matching the 8-character content hash rather than
+  # the extension is deliberate: it keeps unversioned files that sit next to the
+  # document — poster.jpg above all — out of a cache we could not invalidate.
+  <FilesMatch "-[A-Za-z0-9_-]{8}\.(png|jpe?g|webp|avif|svg|woff2?)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+
+  # Video. Only `immutable` because the filename is versioned; bump the name
+  # when you replace the clip.
+  <FilesMatch "\.mp4$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+
+  # The unversioned files that sit next to the document: the two posters, the
+  # icons and the share image. These are exactly the ones the hash rule above
+  # deliberately excludes, so without a rule of their own they fall to whatever
+  # the server defaults to. A week is the compromise — long enough that they
+  # are not re-fetched on every visit, short enough that replacing one reaches
+  # people without a filename change. Replace the share image and social
+  # scrapers will still hold their own copy far longer; that is their cache,
+  # not this one.
+  <FilesMatch "^(poster.*|favicon.*|apple-touch-icon|og-image)\.(jpe?g|png|ico)$">
+    Header set Cache-Control "public, max-age=604800, must-revalidate"
+  </FilesMatch>
+
+  # Crawler files change rarely but must not go stale for long.
+  <FilesMatch "^(robots\.txt|sitemap\.xml)$">
+    Header set Cache-Control "public, max-age=86400, must-revalidate"
+  </FilesMatch>
+
+  # The document must revalidate or deploys stay invisible
+  <FilesMatch "\.html$">
+    Header set Cache-Control "public, max-age=0, must-revalidate"
+  </FilesMatch>
+
+  Header set X-Content-Type-Options "nosniff"
+  Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>

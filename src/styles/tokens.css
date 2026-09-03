@@ -1,0 +1,80 @@
+/* =============================================================
+   Design tokens — single source of truth.
+   ============================================================= */
+
+:root {
+  /* Also declared as a <meta> in the head, which is what gets it applied
+     before the stylesheet arrives. Repeated here because the meta is the
+     weaker of the two: it is a document-level hint, while this is a property
+     that cascades onto the UI the page does not draw itself — form controls,
+     the text selection, and any scrollbar an inner element ends up with. The
+     root bar is hidden outright in main.css; this is what keeps everything
+     else from being painted light. */
+  color-scheme: dark;
+
+  --bg: #0b0e13;
+  --surface: #141922;
+  --surface-2: #1c222d;
+  --border: rgba(255, 255, 255, 0.09);
+
+  --text: #e8ecf2; /* 15.8:1 on --bg */
+  --text-muted: #8b96a8; /*  5.7:1 on --bg — passes AA body text */
+  --text-faint: #5d6675; /* decorative only, never body copy */
+
+  --accent: #e0a458;
+  --accent-ink: #1a1207;
+  --status-ready: #7fc4a0; /* 8.4:1 on --surface */
+  --brand-yellow: #fbd600; /* matches the numeral in the project logos */
+  --brand-blue: #1c3178; /* matches the logo plate, used for its glow */
+  --progress: var(--brand-yellow);
+
+  /* System stack: zero network requests, zero FOIT, no layout shift from a
+     late-arriving webfont. */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  --step--1: clamp(0.83rem, 0.8rem + 0.15vw, 0.9rem);
+  --step-0: clamp(1rem, 0.96rem + 0.2vw, 1.09rem);
+  --step-1: clamp(1.2rem, 1.1rem + 0.5vw, 1.5rem);
+  --step-3: clamp(2rem, 1.6rem + 2vw, 3.2rem);
+
+  --leading-tight: 1.1;
+  --leading-body: 1.6;
+
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2.5rem;
+  --space-3xl: 6.5rem;
+
+  --radius-sm: 6px;
+  --radius-lg: 20px;
+
+  /* One rhythm for the page. JS reads none of these — CSS owns the reveal
+     entirely, the observer only flips a class. */
+  --dur-micro: 200ms;
+  --dur-reveal: 500ms;
+  --reveal-shift: 24px;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (max-width: 767px) {
+  :root {
+    --dur-reveal: 320ms;
+    --reveal-shift: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

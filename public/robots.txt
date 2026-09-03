@@ -1,0 +1,8 @@
+# Single-page site: everything worth indexing is in the one document, and the
+# document ships its content in the markup rather than rendering it with JS,
+# so there is nothing here a crawler needs to be steered around.
+
+User-agent: *
+Allow: /
+
+Sitemap: https://bizimevler.com.tr/sitemap.xml

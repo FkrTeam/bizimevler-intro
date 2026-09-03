@@ -1,0 +1,34 @@
+# Netlify / Cloudflare Pages header rules.
+# Vite copies this file to dist/ as-is.
+
+# ---- HTML: never cache the entry point --------------------------------------
+# Asset filenames are hashed, so the only thing that must revalidate is the
+# document that points at them. Without this a deploy can stay invisible.
+/
+  Cache-Control: public, max-age=0, must-revalidate
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+# ---- Hashed build output: cache forever -------------------------------------
+# Vite puts a content hash in every filename here, so the URL changes whenever
+# the content does. Immutable is always safe.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# ---- Video ------------------------------------------------------------------
+# NOTE: files in public/ are NOT hashed by Vite. `immutable` below is only
+# correct because the filename carries a version. If you replace the clip,
+# bump the filename (be-v2.mp4) and update index.html — do not reuse the name,
+# or clients will hold the old file for a year.
+#
+# Do not compress: MP4 is already compressed, gzip wastes CPU for ~0% gain and
+# some proxies break byte-range requests when they re-encode the body.
+/*.mp4
+  Cache-Control: public, max-age=31536000, immutable
+  Content-Type: video/mp4
+  Accept-Ranges: bytes
+
+# ---- Baseline security ------------------------------------------------------
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin

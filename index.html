@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="%LANG%">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="description" content="%DESCRIPTION%" />
+    <title>%TITLE%</title>
+
+    <!-- Icons, canonical and link-preview tags, all from template.config.js →
+         page. See renderMeta() in vite.config.js. -->
+    %META%
+
+    <!-- Derived from template.config.js at build time: scroll runway, the
+         video's aspect ratio and its poster — including the portrait cut's,
+         under the breakpoint the config names. Emitted as a whole rule block
+         rather than a list of declarations, because the portrait tokens need a
+         media query around them. See vite.config.js. -->
+    <style>
+      %TOKENS%
+    </style>
+
+    <!--
+      Linked here rather than imported from src/main.js. A stylesheet reached
+      through the module graph cannot exist until the module has run, so the
+      first paint is of unstyled markup — on the dev server that is a visible
+      frame of black page, a default-blue skip link and a horizontal scrollbar
+      thrown by the video's intrinsic width. A <link> in the head is
+      render-blocking, so there is no such frame to see.
+    -->
+    <link rel="stylesheet" href="/src/styles/main.css" />
+
+    <!--
+      The poster is a CSS background, so the request for it cannot start until
+      the stylesheet above has been fetched and parsed — which is exactly the
+      window the page would otherwise spend dark. Preloading moves it onto the
+      wire immediately, and the two `media` attributes make sure only the cut
+      that will actually be shown is fetched. Generated from the same config
+      the tokens are, so the breakpoint stays in one place.
+    -->
+    %POSTER_PRELOAD%
+
+    <!--
+      Runs before first paint. Adds .js-anim ONLY when the user has not asked
+      for reduced motion. Everything is visible by default in CSS; this class
+      is what hands visibility over to the scroll-driven properties. Result: no
+      JS, no JS error, no crawler and no reduced-motion user ever sees an empty
+      page.
+    -->
+    <script>
+      (function () {
+        try {
+          if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+            document.documentElement.classList.add("js-anim");
+
+            /* The section is one timed sequence, not a document you hold your
+               place in: the clip plays, then scroll brings the content up over
+               it. Restoring the scroll position drops the visitor into the
+               middle of that sequence — no intro, no hint, and the composition
+               already resolved. So the page is asked to open where the
+               sequence does. Set here rather than in the module so
+               it lands before the browser has restored anything, which is what
+               keeps the reload from flashing the bottom of the section first.
+
+               Only under .js-anim: with reduced motion nothing is pinned or
+               scrubbed, the page is an ordinary document, and holding the
+               reader's place is the right behaviour there. */
+            if ("scrollRestoration" in history) {
+              history.scrollRestoration = "manual";
+            }
+          }
+        } catch (e) {
+          /* matchMedia unsupported — leave content visible */
+        }
+      })();
+    </script>
+  </head>
+
+  <body>
+    <a class="skip-link" href="#projects">%SKIP_LABEL%</a>
+
+    <main>
+      <!--
+        One pinned section carrying the whole sequence: the clip plays, scroll
+        drives it, then the content rises over the held frame. Everything
+        between the markers below is generated from template.config.js.
+      -->
+      <section id="film" class="film">
+        <div class="film__sticky">
+          %VIDEO%
+
+          <div class="film__scrim" aria-hidden="true"></div>
+
+          %MASTHEAD% %PROMPT%
+
+          <div class="film__cards" id="projects">%CONTENT%</div>
+
+          <div class="film__progress" aria-hidden="true">
+            <span data-film-bar></span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

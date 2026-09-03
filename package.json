@@ -1,0 +1,16 @@
+{
+  "name": "scroll-video-template",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Scroll-driven video template — Vite + vanilla JS, zero runtime dependencies",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "encode": "node scripts/encode.mjs"
+  },
+  "devDependencies": {
+    "vite": "^8.1.5"
+  }
+}

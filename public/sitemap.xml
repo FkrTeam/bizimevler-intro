@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- One URL, because there is one page. It exists so the reference in
+     robots.txt resolves rather than 404s, and so the canonical host is stated
+     somewhere a crawler will look first. Update <lastmod> when the content
+     changes; it is a hint, not a promise. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://bizimevler.com.tr/</loc>
+    <lastmod>2026-08-10</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>1.0</priority>
+  </url>
+</urlset>
