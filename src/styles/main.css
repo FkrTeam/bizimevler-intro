@@ -163,6 +163,21 @@ ul {
   background: var(--bg) var(--film-poster, none) center / cover no-repeat;
 }
 
+/* Wide layouts: show the whole frame instead of cropping it. The clip is
+   1920×1000 (1.92:1); a laptop viewport with browser chrome is anywhere from
+   ~1.8:1 to ~2.2:1, and `cover` was trimming the top and bottom of the picture
+   on the short ones. `contain` letterboxes into --bg instead — the page is
+   already that colour, so the bars read as margin, not as a black box. The
+   poster follows so the still and the first decoded frame keep the same box.
+   Below the breakpoint the portrait cut is framed for phones and stays on
+   `cover`. */
+@media (min-width: 720px) {
+  .film__video {
+    object-fit: contain;
+    background-size: contain;
+  }
+}
+
 /* Just enough darkening at the two edges to keep the logo and the hint legible
    over any frame. The middle of the picture is left completely alone. */
 .film__scrim {
