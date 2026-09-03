@@ -11,6 +11,7 @@
     "encode": "node scripts/encode.mjs"
   },
   "devDependencies": {
-    "vite": "^8.1.5"
+    "vite": "^8.1.5",
+    "wrangler": "^4.128.0"
   }
 }

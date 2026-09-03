@@ -1,10 +1,19 @@
-// Cloudflare Workers (static assets) config.
+// Cloudflare Workers config.
 // Build: npm run build  ->  Deploy: npx wrangler deploy
+//
+// The site is static; the Worker in worker/index.js exists only to answer
+// byte-range requests for the video with 206 responses, which the asset store
+// does not do on its own and which Safari requires before it will play.
 {
   "name": "bizimevler-intro",
+  "main": "worker/index.js",
   "compatibility_date": "2026-09-03",
   "assets": {
     "directory": "./dist",
-    "not_found_handling": "404-page"
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    // Only video goes through the Worker; everything else is served directly
+    // from the asset store on the fast path.
+    "run_worker_first": ["/*.mp4"]
   }
 }

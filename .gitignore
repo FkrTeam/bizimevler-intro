@@ -13,3 +13,6 @@ _source/
 .DS_Store
 Thumbs.db
 *.log
+
+# Wrangler local state
+.wrangler/

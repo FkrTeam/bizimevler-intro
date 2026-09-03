@@ -86,7 +86,8 @@ public/                   ← Vite işlemeden dist/ köküne kopyalar
 ├── robots.txt / sitemap.xml
 ├── .htaccess             ← Apache / cPanel
 └── _headers              ← CANLI HEDEF: Cloudflare Workers/Pages, Netlify
-wrangler.jsonc            ← Cloudflare Workers (static assets) deploy config
+wrangler.jsonc            ← Cloudflare Workers deploy config
+worker/index.js           ← Cloudflare Worker: .mp4 için byte-range (206) yanıtları
 vercel.json               ← Vercel (kullanılmıyor)
 deploy/
 └── nginx.conf            ← nginx (kullanılmıyor)
@@ -468,9 +469,21 @@ ve **range request'i bozar**.
 **Cache:** `index.html` → `max-age=0, must-revalidate` (yoksa deploy görünmez) ·
 `/assets/*` ve `/*.mp4` → `immutable`.
 
-Host'a göre dosyalar hazır: `public/_headers` + `wrangler.jsonc` (Cloudflare
-Workers — canlı hedef; aynı `_headers` Cloudflare Pages ve Netlify'da da çalışır),
-`vercel.json`, `deploy/nginx.conf`, `public/.htaccess` (Apache).
+Host'a göre dosyalar hazır: `public/_headers` + `wrangler.jsonc` + `worker/`
+(Cloudflare Workers — canlı hedef; aynı `_headers` Cloudflare Pages ve Netlify'da
+da çalışır), `vercel.json`, `deploy/nginx.conf`, `public/.htaccess` (Apache).
+
+**Byte-range zorunlu.** Safari, `Range` isteğine `206 Partial Content` dönmeyen
+bir sunucudan video oynatmaz; Chromium ise her seek'te dosyayı baştan indirir.
+Apache, nginx, Vercel ve Netlify bunu kendiliğinden yapar. Cloudflare'in statik
+dosya servisi yapmaz — `worker/index.js` bu yüzden var: `.mp4` istekleri
+(`run_worker_first`) Worker'a düşer, o da dosyayı dilimleyip `206` döner. Yerelde
+denemek için `npx wrangler dev`, sonra:
+
+```bash
+curl -sI -H "Range: bytes=0-1023" http://127.0.0.1:8787/be-v11.mp4
+# beklenen: HTTP/1.1 206 Partial Content, Content-Range: bytes 0-1023/<boyut>
+```
 
 ---
 
