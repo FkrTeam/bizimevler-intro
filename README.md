@@ -84,10 +84,11 @@ public/                   ← Vite işlemeden dist/ köküne kopyalar
 ├── og-image.jpg          ← paylaşım görseli, 1200×630
 ├── favicon.ico / favicon-32.png / apple-touch-icon.png
 ├── robots.txt / sitemap.xml
-└── .htaccess             ← CANLI HEDEF: Apache / cPanel
+├── .htaccess             ← Apache / cPanel
+└── _headers              ← CANLI HEDEF: Cloudflare Workers/Pages, Netlify
+wrangler.jsonc            ← Cloudflare Workers (static assets) deploy config
 vercel.json               ← Vercel (kullanılmıyor)
 deploy/
-├── _headers              ← Netlify / Cloudflare Pages (kullanılmıyor)
 └── nginx.conf            ← nginx (kullanılmıyor)
 src/
 ├── main.js               ← config'i modüllere bağlar
@@ -467,7 +468,8 @@ ve **range request'i bozar**.
 **Cache:** `index.html` → `max-age=0, must-revalidate` (yoksa deploy görünmez) ·
 `/assets/*` ve `/*.mp4` → `immutable`.
 
-Host'a göre dosyalar hazır: `public/_headers` (Netlify, Cloudflare Pages),
+Host'a göre dosyalar hazır: `public/_headers` + `wrangler.jsonc` (Cloudflare
+Workers — canlı hedef; aynı `_headers` Cloudflare Pages ve Netlify'da da çalışır),
 `vercel.json`, `deploy/nginx.conf`, `public/.htaccess` (Apache).
 
 ---
