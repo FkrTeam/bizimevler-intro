@@ -500,9 +500,14 @@ ul {
   }
 }
 
+/* Sized for two cards. At the 68rem the three-card row used, two cards grow
+   to ~33rem each and the 3:2 photographs alone stand 22rem tall — the pair
+   stops reading as cards and starts reading as a two-up gallery, and on a
+   680px laptop the composition no longer fits the pinned screen. 54rem keeps
+   each card around 26rem: the same card, not a stretched one. */
 .film__cards-inner {
   width: 100%;
-  max-width: 68rem;
+  max-width: 54rem;
 }
 
 /* The slogan carries the section on its own now that the eyebrow is gone, so
@@ -521,7 +526,8 @@ ul {
 
 @media (min-width: 720px) {
   .cards {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-xl);
   }
 }
 
@@ -657,8 +663,10 @@ ul {
    Two places it would otherwise overflow:
 --------------------------------------------------------------------------- */
 
-/* Narrow: three stacked portrait cards cannot fit a phone screen, so the card
-   turns on its side. Same parts, laid horizontally. */
+/* Narrow: stacked portrait cards cannot fit a phone screen, so the card
+   turns on its side. Same parts, laid horizontally. With two cards rather
+   than three there is room to let the photograph and the logo breathe a
+   little; the row still clears a 640px-tall phone with the title above it. */
 @media (max-width: 719px) {
   .card {
     flex-direction: row;
@@ -666,19 +674,19 @@ ul {
 
   .card__photo {
     flex: none;
-    width: 38%;
+    width: 42%;
     aspect-ratio: 1 / 1;
   }
 
   .card__content {
     flex: 1;
     justify-content: center;
-    gap: 0.55rem;
+    gap: 0.65rem;
     padding: var(--space-md);
   }
 
   .card__logo {
-    width: 96px;
+    width: 108px;
   }
 }
 

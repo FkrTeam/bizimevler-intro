@@ -200,14 +200,14 @@ export default {
      * How wide a card photograph actually renders, so the browser can pick a
      * width from `photo.srcset` before it knows the layout. Read it against
      * main.css: below 720px the card turns on its side and the photo takes
-     * 38% of it; above that the row is three columns inside a 68rem container,
-     * so each one is (viewport − padding − gaps) / 3 until the container caps.
+     * 42% of it; above that the row is two columns inside a 54rem container,
+     * so each one is (viewport − padding − gap) / 2 until the container caps.
      *
      * These are the render widths, not the file widths — the browser
-     * multiplies by the device pixel ratio itself. A 347px slot on a 2× screen
-     * asks for 694px and gets the 800.
+     * multiplies by the device pixel ratio itself. A 410px slot on a 2× screen
+     * asks for 820px and gets the 1200.
      */
-    photoSizes: "(max-width: 719px) 40vw, (max-width: 1136px) 31vw, 347px",
+    photoSizes: "(max-width: 719px) 44vw, (max-width: 919px) 46vw, 410px",
 
     items: [
       {
@@ -251,24 +251,27 @@ export default {
         status: { label: "Taşınmaya hazır", tone: "ready" },
         meta: "Ispartakule",
       },
-      {
-        name: "Bizim Evler 10",
-        href: "https://bizimevler.com.tr/landing_page_10/",
-        external: true,
-        photo: {
-          src: "/src/assets/projects/be10-800.webp",
-          srcset: {
-            480: "/src/assets/projects/be10-480.webp",
-            800: "/src/assets/projects/be10-800.webp",
-            1200: "/src/assets/projects/be10-1200.webp",
-          },
-          width: 1200,
-          height: 898,
-        },
-        logo: { src: "/src/assets/projects/be10logo.png", width: 308, height: 93 },
-        status: { label: "Taşınmaya hazır", tone: "ready" },
-        meta: "Ispartakule",
-      },
+      /* Bizim Evler 10 — pulled from the page for now. Kept here so putting it
+         back is a matter of removing this comment; the grid in main.css is set
+         for two cards, so restore it to three columns at the same time. */
+      // {
+      //   name: "Bizim Evler 10",
+      //   href: "https://bizimevler.com.tr/landing_page_10/",
+      //   external: true,
+      //   photo: {
+      //     src: "/src/assets/projects/be10-800.webp",
+      //     srcset: {
+      //       480: "/src/assets/projects/be10-480.webp",
+      //       800: "/src/assets/projects/be10-800.webp",
+      //       1200: "/src/assets/projects/be10-1200.webp",
+      //     },
+      //     width: 1200,
+      //     height: 898,
+      //   },
+      //   logo: { src: "/src/assets/projects/be10logo.png", width: 308, height: 93 },
+      //   status: { label: "Taşınmaya hazır", tone: "ready" },
+      //   meta: "Ispartakule",
+      // },
     ],
   },
 

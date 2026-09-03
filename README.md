@@ -517,6 +517,8 @@ yoksa Safari burada düşer). `network 3` → dosya hiç gelmedi.
 
 - Tek tema (koyu). Video arka planı sayfa arka planıyla eşleşmek zorunda:
   `tokens.css` içindeki `--bg`.
-- İçerik ızgarası üç karta göre ayarlı. Farklı sayı için `main.css` içindeki
-  `.cards` grid tanımı değişmeli.
+- İçerik ızgarası iki karta göre ayarlı (`.cards` → `repeat(2, 1fr)`,
+  `.film__cards-inner` → `max-width: 54rem`). Bizim Evler 10 kartı
+  `template.config.js` içinde yorum satırında; geri alırken grid'i üç sütuna
+  (`repeat(3, 1fr)`, `68rem`) ve `photoSizes`'ı üçe göre güncelleyin.
 - Tarayıcıda görsel doğrulama yapılmadı; sayılar ve build doğrulandı.
