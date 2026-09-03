@@ -503,8 +503,9 @@ alttaki olay günlüğü. `play() REJECTED NotAllowedError` → otomatik oynatma
 politikası (Opera Mobile, iOS Düşük Güç Modu, veri tasarrufu); oynatıcı bu
 durumda posteri tutar, ipucu `promptTap` metnine ("İzlemek için dokunun") döner
 ve ilk dokunuşta yeniden dener. `play() REJECTED AbortError ... background
-media was paused` → sayfa arka planda açıldı; sekme görünür olunca yeniden
-denenir. `error 3 DECODE` / `4 SRC_NOT_SUPPORTED` → kodek veya sunucu (byte-range
+media was paused` → sayfa arka planda açıldı (pasif sekme, başka pencerenin
+arkasında kalan pencere); dokunma ipucu gösterilmez, sekme görünür olunca
+yeniden denenir. `error 3 DECODE` / `4 SRC_NOT_SUPPORTED` → kodek veya sunucu (byte-range
 yoksa Safari burada düşer). `network 3` → dosya hiç gelmedi.
 
 `?noblur` ile kartların backdrop blur'ünü kapatabilirsiniz. Birleştirin:

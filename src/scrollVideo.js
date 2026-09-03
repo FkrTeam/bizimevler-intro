@@ -400,13 +400,42 @@ export function initScrollVideo({
      gesture retries. A tap or a key is a gesture; so is the touchend at the
      end of a swipe — and if that swipe already scrolled past the intro, the
      skip handlers have settled things and the retry steps aside. Only when
-     the retry is refused too do we park at the end as before. */
+     the retry is refused too do we park at the end as before.
+
+     Not every rejection is a refusal, though. A policy says no with
+     NotAllowedError. AbortError means the request was interrupted — and
+     Chromium interrupts video-only playback whenever the document is hidden,
+     which is what a link opened into a background tab, or a window sitting
+     behind another one, looks like on load. Asking for a touch there would be
+     wrong twice: nothing is stopping playback except the tab being out of
+     sight, and the visitor cannot see the request anyway. So a hidden-time
+     abort waits for the tab to come back (see onVisibilityChange), a visible
+     one gets a single quiet retry, and only a second rejection is treated as
+     the browser meaning it. */
 
   const GESTURE_EVENTS = ["pointerup", "touchend", "keydown"];
   let gestureRetryArmed = false;
   let autoplayRefused = false;
+  let abortRetried = false;
 
-  function retryOnGesture() {
+  function introPending() {
+    return (REWIND && phase === PLAYING) || (HOLD && !introSettled);
+  }
+
+  function retryOnGesture(error) {
+    if (error?.name === "AbortError") {
+      if (document.visibilityState === "hidden") return;
+      if (!abortRetried) {
+        abortRetried = true;
+        setTimeout(() => {
+          if (introPending() && video.paused && !video.ended) {
+            tryPlay(retryOnGesture);
+          }
+        }, 250);
+        return;
+      }
+    }
+
     if (!autoplayRefused) {
       autoplayRefused = true;
       onAutoplayRefused?.();
@@ -548,9 +577,7 @@ export function initScrollVideo({
       // the intro is still the thing running. Once "hold" has settled, the
       // paused element IS the finished state, and resuming it would replay the
       // clip out from under the content sitting on top of it.
-      const introRunning = (REWIND && phase === PLAYING) || (HOLD && !introSettled);
-
-      if (introRunning) {
+      if (introPending()) {
         if (onScreen && video.paused && !video.ended) {
           tryPlay(() => {});
         } else if (!onScreen && !video.paused) {
@@ -573,8 +600,7 @@ export function initScrollVideo({
   function onVisibilityChange() {
     syncLoop();
     if (document.visibilityState !== "visible") return;
-    const introPending = (REWIND && phase === PLAYING) || (HOLD && !introSettled);
-    if (introPending && onScreen && video.paused && !video.ended) {
+    if (introPending() && onScreen && video.paused && !video.ended) {
       tryPlay(retryOnGesture);
     }
   }
