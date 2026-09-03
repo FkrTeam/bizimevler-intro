@@ -774,6 +774,12 @@ ul {
   transform: none;
 }
 
+/* Asking for a touch, not a scroll: the descending line is a scroll gesture,
+   so it steps aside while the hint is doing that job. */
+.film__prompt.is-tap .film__prompt-line {
+  visibility: hidden;
+}
+
 /* =============================================================
    Reduced motion
    ============================================================= */

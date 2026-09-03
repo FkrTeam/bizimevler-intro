@@ -71,6 +71,9 @@ import { prefersReducedMotion } from "./utils/motionPrefs.js";
  *                                        no part of the timeline
  * @param {Function}[o.onScrubStart]
  * @param {Function}[o.onScrubProgress]   receives 0-1 across the section
+ * @param {Function}[o.onAutoplayRefused] the browser wants a gesture first;
+ *                                        the poster stays up until one comes
+ * @param {Function}[o.onAutoplayRecovered] playback started after a refusal
  */
 export function initScrollVideo({
   video,
@@ -82,6 +85,8 @@ export function initScrollVideo({
   videoSpan = 1,
   onScrubStart,
   onScrubProgress,
+  onAutoplayRefused,
+  onAutoplayRecovered,
 }) {
   if (!video || !section) return null;
 
@@ -373,11 +378,19 @@ export function initScrollVideo({
 
   function startAutoplay() {
     video.playbackRate = playbackRate;
+    tryPlay(retryOnGesture);
+  }
 
+  /** play(), with a refused earlier attempt cleared once one succeeds. */
+  function tryPlay(onRefused) {
     const attempt = video.play();
-    if (attempt && typeof attempt.then === "function") {
-      attempt.catch(retryOnGesture);
-    }
+    if (!attempt || typeof attempt.then !== "function") return;
+    attempt.then(() => {
+      if (!autoplayRefused) return;
+      autoplayRefused = false;
+      disarmGestureRetry();
+      onAutoplayRecovered?.();
+    }, onRefused);
   }
 
   /* Autoplay was refused. That is not always final: iOS in Low Power Mode,
@@ -391,8 +404,13 @@ export function initScrollVideo({
 
   const GESTURE_EVENTS = ["pointerup", "touchend", "keydown"];
   let gestureRetryArmed = false;
+  let autoplayRefused = false;
 
   function retryOnGesture() {
+    if (!autoplayRefused) {
+      autoplayRefused = true;
+      onAutoplayRefused?.();
+    }
     if (gestureRetryArmed) return;
     gestureRetryArmed = true;
     for (const type of GESTURE_EVENTS) {
@@ -412,11 +430,7 @@ export function initScrollVideo({
     disarmGestureRetry();
     if (HOLD && introSettled) return;
     if (REWIND && phase !== PLAYING) return;
-
-    const attempt = video.play();
-    if (attempt && typeof attempt.then === "function") {
-      attempt.catch(parkAtEnd);
-    }
+    tryPlay(parkAtEnd);
   }
 
   function parkAtEnd() {
@@ -538,7 +552,7 @@ export function initScrollVideo({
 
       if (introRunning) {
         if (onScreen && video.paused && !video.ended) {
-          video.play().catch(() => {});
+          tryPlay(() => {});
         } else if (!onScreen && !video.paused) {
           video.pause();
         }
@@ -561,10 +575,7 @@ export function initScrollVideo({
     if (document.visibilityState !== "visible") return;
     const introPending = (REWIND && phase === PLAYING) || (HOLD && !introSettled);
     if (introPending && onScreen && video.paused && !video.ended) {
-      const attempt = video.play();
-      if (attempt && typeof attempt.then === "function") {
-        attempt.catch(retryOnGesture);
-      }
+      tryPlay(retryOnGesture);
     }
   }
 

@@ -178,6 +178,12 @@ export default {
   /** Scroll hint. Set to null to omit it. */
   prompt: "Keşfetmek için kaydırın",
 
+  /** Shown in the hint's place when the browser refuses to autoplay the
+   *  intro (Opera Mobile does, iOS in Low Power Mode does) — the visitor has
+   *  to touch the page once, and this tells them so. Set to null to keep the
+   *  scroll hint regardless. */
+  promptTap: "İzlemek için dokunun",
+
   /* --------------------------------------------------------------------
      CONTENT — the cards revealed over the held frame.
 

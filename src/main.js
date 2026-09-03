@@ -122,6 +122,33 @@ function onScrubProgress(progress) {
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Refused autoplay
+
+   Some browsers will not start even a muted clip without a touch (Opera
+   Mobile as shipped, iOS in Low Power Mode). The player keeps the poster up
+   and retries on the first gesture; the visitor just needs to be told that
+   a touch is what is wanted, since "scroll to explore" would send them past
+   the intro instead. The hint swaps its text for that, and swaps back the
+   moment playback starts — or when the intro is skipped and the hint takes
+   up its normal job.
+--------------------------------------------------------------------------- */
+
+const promptText = prompt?.querySelector(".film__prompt-text");
+const promptDefault = promptText?.textContent ?? "";
+
+function showTapPrompt() {
+  if (!prompt || !promptText || !config.promptTap) return;
+  promptText.textContent = config.promptTap;
+  prompt.classList.add("is-tap", "is-active");
+}
+
+function restorePrompt() {
+  if (!prompt) return;
+  prompt.classList.remove("is-tap");
+  if (promptText) promptText.textContent = promptDefault;
+}
+
 initScrollVideo({
   video,
   section,
@@ -130,6 +157,15 @@ initScrollVideo({
   fps: videoCfg.fps,
   playbackRate: videoCfg.playbackRate,
   videoSpan: scroll.videoSpan,
-  onScrubStart: () => prompt?.classList.add("is-active"),
+  onScrubStart: () => {
+    restorePrompt();
+    prompt?.classList.add("is-active");
+  },
   onScrubProgress,
+  onAutoplayRefused: showTapPrompt,
+  onAutoplayRecovered: () => {
+    restorePrompt();
+    // Back to hidden; it fades in again when the intro settles, as normal.
+    prompt?.classList.remove("is-active");
+  },
 });

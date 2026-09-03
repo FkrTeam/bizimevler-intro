@@ -500,8 +500,9 @@ verir ama sayılar ayırır:
 
 Panel "oynamıyor" şikâyetini de ayırır: `state`, `last event`, `error` ve
 alttaki olay günlüğü. `play() REJECTED NotAllowedError` → otomatik oynatma
-politikası (iOS Düşük Güç Modu, veri tasarrufu); oynatıcı bu durumda posteri
-tutar ve ilk dokunuşta yeniden dener. `play() REJECTED AbortError ... background
+politikası (Opera Mobile, iOS Düşük Güç Modu, veri tasarrufu); oynatıcı bu
+durumda posteri tutar, ipucu `promptTap` metnine ("İzlemek için dokunun") döner
+ve ilk dokunuşta yeniden dener. `play() REJECTED AbortError ... background
 media was paused` → sayfa arka planda açıldı; sekme görünür olunca yeniden
 denenir. `error 3 DECODE` / `4 SRC_NOT_SUPPORTED` → kodek veya sunucu (byte-range
 yoksa Safari burada düşer). `network 3` → dosya hiç gelmedi.
