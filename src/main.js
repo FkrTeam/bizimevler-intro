@@ -33,6 +33,40 @@ if (flags.has("noblur")) document.documentElement.classList.add("no-blur");
 initDebug(video);
 
 /* ---------------------------------------------------------------------------
+   The right cut, checked
+
+   <source media> is meant to settle which file is fetched before a byte of
+   either moves, and on Chromium it does. iOS Safari runs the media element's
+   resource selection while the parser is still early in the document, before
+   the viewport meta has taken effect: it evaluates (max-width: 719px) against
+   the 980px legacy layout viewport, finds it false, and hands an iPhone the
+   wide cut — 1920 wide, nine megabytes, with an ending framed for a desktop
+   that, cover-cropped into a portrait screen, looks like the clip stopping on
+   a random shot. Seen on iOS 18 with the ?debug panel reporting the wide
+   file at a 440px viewport.
+
+   So the choice is checked here, once layout is real, against the same query
+   the config emits. On a mismatch the source list is replaced by one explicit
+   src, which restarts loading on the cut the page actually wants. A browser
+   that chose correctly keeps its download untouched; the check runs before
+   the player is wired so its metadata handlers only ever see the right file.
+--------------------------------------------------------------------------- */
+
+function ensureCut() {
+  const p = videoCfg.portrait;
+  if (!p || typeof matchMedia !== "function") return;
+
+  const want = matchMedia(p.media).matches ? p.src : videoCfg.src;
+  const name = (url) => url.split("/").pop().split("?")[0];
+  if (video.currentSrc && name(video.currentSrc) === name(want)) return;
+
+  for (const source of video.querySelectorAll("source")) source.remove();
+  video.src = want;
+}
+
+ensureCut();
+
+/* ---------------------------------------------------------------------------
    Poster retirement
 
    The poster is the video element's CSS background, and a background under an

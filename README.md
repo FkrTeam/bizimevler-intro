@@ -216,6 +216,16 @@ penceresini breakpoint'in ötesine sürüklerseniz başladığı kadrajla kalır
 takasın doğru tarafı — alternatifi, yalnızca pencere sürüklenirken doğan bir
 durumu düzeltmek için megabaytlarca dosyayı ikinci kez indirmek.
 
+**iOS Safari bu seçimi yanlış yapıyor.** Kaynak seçimini belge daha başındayken,
+viewport meta'sı uygulanmadan çalıştırıyor; `(max-width: 719px)` 980px'lik eski
+düzen viewport'una karşı değerlendiriliyor, yanlış çıkıyor ve iPhone'a geniş
+kadraj gidiyor — 9 MB, masaüstü için kurgulanmış bir sonla; o son dikey ekrana
+kırpılınca klip rastgele bir sahnede durmuş gibi okunuyor. iOS 18'de `?debug`
+paneli 440px viewport'ta `be-v13.mp4` gösterdi. `main.js` bu yüzden seçimi
+düzen oturduktan sonra aynı sorguyla bir kez daha kontrol eder (`ensureCut`);
+uyuşmazlıkta `<source>` listesini tek bir açık `src` ile değiştirir ve yükleme
+doğru dosyada yeniden başlar. Doğru seçen tarayıcıya dokunulmaz.
+
 `poster` **attribute'u kullanılmıyor**: tek dosya alır, dikey kadrajın kendi
 posteri gerekir. İkisi de build'de `index.html`'in satır içi `<style>` bloğuna
 `.film__video{background-image}` kuralı olarak yazılır (dikey olan config'in
