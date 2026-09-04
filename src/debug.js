@@ -90,6 +90,23 @@ export function initDebug(video) {
     video.addEventListener(type, () => note(type));
   }
 
+  /* Gestures, because "I tapped and nothing happened" has two readings: the
+     tap never reached the page (an overlay, a browser gesture, a synthetic
+     event without activation) or it did and play() was refused regardless.
+     Logged from the same capture phase the player listens in, with the
+     activation state the engine reports at that moment. */
+  for (const type of ["pointerup", "touchend", "click", "keydown"]) {
+    addEventListener(
+      type,
+      (e) => {
+        const target = e.target?.tagName?.toLowerCase() ?? "?";
+        const active = navigator.userActivation?.isActive ?? "?";
+        note(`${type} on <${target}> trusted=${e.isTrusted} active=${active}`);
+      },
+      { capture: true, passive: true }
+    );
+  }
+
   // play() is where autoplay policy shows up: a refusal is a rejected promise,
   // not an event. Wrapped on the instance, so the player's own calls are seen.
   const nativePlay = video.play;

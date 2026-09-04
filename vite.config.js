@@ -235,7 +235,6 @@ function templatePlugin() {
          scroll fraction driving the whole sequence jumps mid-gesture. */
       `--film-runway:${runway}lvh;`,
       `--film-aspect:${c.video.width}/${c.video.height};`,
-      `--film-poster:url("${publicPath(c.video.poster)}");`,
       /* How far the prompt lives, so the fill descending its track can be
          scaled to finish exactly as the prompt finishes fading. Emitted rather
          than written into the stylesheet because the number belongs to the
@@ -244,14 +243,28 @@ function templatePlugin() {
       `--film-prompt-span:${c.scroll.promptFade?.[1] ?? 0.46};`,
     ].join("");
 
-    const blocks = [`:root{${root}}`];
+    /* The poster is a rule here, not a custom property. A url() inside a
+       custom property is resolved where the var() is substituted, and that is
+       .film__video in the hashed stylesheet under /assets/ — so a relative
+       poster path, which is what a "./" base leaves after Vite's rewrite,
+       was being fetched as /assets/poster.jpg and 404ing. Nobody saw it on a
+       fast connection because the first decoded frame covers the same box;
+       on a phone it was the black screen before the clip arrived. Declared
+       in this inline block, the URL resolves against the document, which is
+       where the file actually sits relative to. main.css sets every other
+       background longhand and leaves background-image alone, so source order
+       between this block and the stylesheet does not matter. */
+    const poster = (href) =>
+      `.film__video{background-image:url("${publicPath(href)}")}`;
+
+    const blocks = [`:root{${root}}`, poster(c.video.poster)];
 
     if (p) {
-      const portrait = [
-        `--film-aspect:${p.width}/${p.height};`,
-        `--film-poster:url("${publicPath(p.poster)}");`,
-      ].join("");
-      blocks.push(`@media ${p.media}{:root{${portrait}}}`);
+      blocks.push(
+        `@media ${p.media}{:root{--film-aspect:${p.width}/${p.height};}${poster(
+          p.poster
+        )}}`
+      );
     }
 
     /* The narrow breakpoint moves where the prompt ends, and the fill

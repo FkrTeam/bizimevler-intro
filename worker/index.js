@@ -16,9 +16,46 @@
  * does not report a Content-Length, and a `206` cannot be written without
  * knowing the total size. The clips are a few megabytes, well inside the
  * Worker's memory; the asset fetch itself is served from Cloudflare's cache.
+ *
+ * That read is then kept. A phone does not ask for the clip once: Safari
+ * probes with a two-byte range, then walks the file in chunks, and Chromium
+ * opens a new range every time it seeks or its buffer runs dry — a dozen or
+ * more requests for one playback. Paying a full multi-megabyte asset fetch
+ * for each of them is what turned the intro into a stop-start affair on
+ * mobile. So once a file has been read, the isolate holds on to it and every
+ * later range is a slice of memory. Keyed by path and validator, so a redeploy
+ * that reuses a filename (which the cache headers say not to do) still cannot
+ * serve a stale body.
  */
 
 const VIDEO = /\.mp4$/i;
+
+/** @type {Map<string, {file: ArrayBuffer, headers: Headers}>} */
+const held = new Map();
+const HOLD_LIMIT = 4;
+
+/** The whole asset, from memory when this isolate has read it before. */
+async function readAsset(env, url) {
+  // Ask the store for the whole file. It ignores Range anyway; a bare request
+  // keeps the upstream identical to a plain download and so cache-friendly.
+  const upstream = await env.ASSETS.fetch(new Request(url));
+  if (upstream.status !== 200 || !upstream.body) return { upstream };
+
+  const key = `${url.pathname}|${upstream.headers.get("ETag") ?? ""}|${
+    upstream.headers.get("Last-Modified") ?? ""
+  }`;
+  const hit = held.get(key);
+  if (hit) {
+    // The body was fetched only to learn the validator; let it go unread.
+    await upstream.body.cancel().catch(() => {});
+    return { ...hit, headers: upstream.headers };
+  }
+
+  const file = await upstream.arrayBuffer();
+  if (held.size >= HOLD_LIMIT) held.delete(held.keys().next().value);
+  held.set(key, { file, headers: upstream.headers });
+  return { file, headers: upstream.headers };
+}
 
 export default {
   async fetch(request, env) {
@@ -29,32 +66,28 @@ export default {
       return env.ASSETS.fetch(request);
     }
 
-    // Ask the store for the whole file. It ignores Range anyway; dropping the
-    // header keeps the upstream request identical to a plain download.
-    const headers = new Headers(request.headers);
-    headers.delete("Range");
-    headers.delete("If-Range");
-    const upstream = await env.ASSETS.fetch(new Request(url, { headers }));
+    const { upstream, file, headers: assetHeaders } = await readAsset(env, url);
+    if (!file) return upstream;
 
-    if (upstream.status !== 200 || !upstream.body) return upstream;
+    const full = () =>
+      new Response(file, { status: 200, headers: withLength(assetHeaders, file) });
 
     // If-Range: the client holds a version and only wants the slice if it is
     // still that version. On a mismatch the spec says: send the whole thing.
     const ifRange = request.headers.get("If-Range");
     if (ifRange) {
-      const etag = upstream.headers.get("ETag");
-      const lastModified = upstream.headers.get("Last-Modified");
-      if (ifRange !== etag && ifRange !== lastModified) return upstream;
+      const etag = assetHeaders.get("ETag");
+      const lastModified = assetHeaders.get("Last-Modified");
+      if (ifRange !== etag && ifRange !== lastModified) return full();
     }
 
-    const file = await upstream.arrayBuffer();
     const total = file.byteLength;
 
     const slice = parseRange(range, total);
     if (slice === null) {
       // Not a single byte range we serve (multipart, malformed): the full
       // file is the safe answer.
-      return new Response(file, { status: 200, headers: upstream.headers });
+      return full();
     }
     if (slice === "unsatisfiable") {
       return new Response(null, {
@@ -67,7 +100,7 @@ export default {
     }
 
     const { start, end } = slice;
-    const out = new Headers(upstream.headers);
+    const out = new Headers(assetHeaders);
     out.set("Content-Range", `bytes ${start}-${end}/${total}`);
     out.set("Content-Length", String(end - start + 1));
     out.set("Accept-Ranges", "bytes");
@@ -76,6 +109,16 @@ export default {
     return new Response(file.slice(start, end + 1), { status: 206, headers: out });
   },
 };
+
+/** A full-body answer built from memory: the store's headers, plus the size
+ *  the store never states, minus the encoding it no longer has. */
+function withLength(headers, file) {
+  const out = new Headers(headers);
+  out.set("Content-Length", String(file.byteLength));
+  out.set("Accept-Ranges", "bytes");
+  out.delete("Content-Encoding");
+  return out;
+}
 
 /**
  * `bytes=a-b`, `bytes=a-`, `bytes=-n` → { start, end } (inclusive), or

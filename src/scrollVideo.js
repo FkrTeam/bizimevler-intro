@@ -107,9 +107,21 @@ export function initScrollVideo({
    * "hold" only, and deliberately far larger than HANDOVER_EPSILON. Cutting the
    * intro is not reversible, so it must not fire on a stray wheel notch or the
    * couple of pixels a phone gives back after an overscroll — it should take a
-   * gesture that clearly means "move on".
+   * gesture that clearly means "move on". On a touch screen that bar is
+   * higher: 6% of a phone's travel is under 50px, which a thumb resting on
+   * the glass produces without meaning anything, and every such touch was
+   * cutting the intro to its last frame — which, being a still, read as the
+   * video having frozen. 14% is a swipe.
    */
-  const HOLD_SKIP_EPSILON = 0.06;
+  const COARSE =
+    typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+  const HOLD_SKIP_EPSILON = COARSE ? 0.14 : 0.06;
+  /** "hold" only: how fast the clip runs to its end when it is skipped before
+   *  the end has downloaded. See skipIntro(). */
+  const HURRY_RATE = 3;
+  /** Media time not moving for this long, while it should be, means the data
+   *  is not coming. See watchForStall(). */
+  const STALL_MS = 6000;
 
   /**
    * "hold" only. The intro is a one-shot: once it has ended or been skipped,
@@ -118,6 +130,15 @@ export function initScrollVideo({
    * `ended` false with nothing left to play.
    */
   let introSettled = false;
+  /** "hold" only. The visitor moved on before the end had downloaded, so the
+   *  clip is running to it at HURRY_RATE rather than seeking into data that
+   *  is not there yet. */
+  let hurrying = false;
+  /** True once the intro's first play() has been issued — by the gate in
+   *  startAutoplay(), or by a skip that hurried the clip. Until then the
+   *  resume paths (section back on screen, tab back in front) have nothing
+   *  to resume, and must not jump the gate. */
+  let introStarted = false;
 
   // "hold" never scrubs the timeline, but the loop still has to run so scroll
   // keeps driving the reveal — SCRUBBING is what syncLoop() gates on.
@@ -203,14 +224,21 @@ export function initScrollVideo({
   else video.addEventListener("loadedmetadata", onMetadata, { once: true });
 
   /* ---- Scroll progress ---------------------------------------------------
-     The section is taller than the viewport and its child is sticky, so the
-     distance the section's top travels above the viewport top is exactly the
-     pinned duration.
+     The section is taller than its sticky child, so the distance the
+     section's top travels above the viewport top before the child unpins is
+     exactly the section's height less the child's — and that is the divisor,
+     not the viewport. On a phone the two differ: the child is sized in lvh so
+     the address bar cannot resize it, while innerHeight follows the bar,
+     growing by its height on the very first swipe. Dividing by innerHeight
+     made the fraction jump mid-gesture, which read as the reveal lurching.
   ------------------------------------------------------------------------ */
+
+  const sticky = section.firstElementChild;
 
   function readProgress() {
     const rect = section.getBoundingClientRect();
-    const scrollable = rect.height - innerHeight;
+    const pinned = sticky ? sticky.offsetHeight : innerHeight;
+    const scrollable = rect.height - pinned;
     if (scrollable <= 0) return 0;
     return clamp(-rect.top / scrollable, 0, 1);
   }
@@ -340,13 +368,25 @@ export function initScrollVideo({
      they share one function rather than three near-copies that could drift.
   ------------------------------------------------------------------------ */
 
+  /** The scrub-phase hook fires once per page, whichever path gets there
+   *  first — a skip announces it as soon as the visitor starts scrolling,
+   *  and settling must not repeat it. */
+  let scrubAnnounced = false;
+  function announceScrub() {
+    if (scrubAnnounced) return;
+    scrubAnnounced = true;
+    onScrubStart?.();
+  }
+
   /** @param {boolean} seek false when the clip already ended on that frame. */
   function settleOnLastFrame(seek) {
     if (introSettled) return;
     introSettled = true;
+    hurrying = false;
 
     removeEventListener("scroll", watchForSkip);
     video.pause();
+    video.playbackRate = playbackRate;
 
     if (seek) {
       // A frame short of the duration: seeking to the duration exactly is the
@@ -359,13 +399,101 @@ export function initScrollVideo({
       else video.addEventListener("loadedmetadata", park, { once: true });
     }
 
-    onScrubStart?.();
+    announceScrub();
+  }
+
+  /** True when the frame the intro settles on has already downloaded. */
+  function lastFrameBuffered() {
+    const ranges = video.buffered;
+    if (duration <= 0 || !ranges) return false;
+    const t = Math.max(duration - FRAME, 0);
+    for (let i = 0; i < ranges.length; i++) {
+      if (t >= ranges.start(i) - FRAME && t <= ranges.end(i) + FRAME) return true;
+    }
+    return false;
+  }
+
+  /* The visitor scrolled on before the clip finished. The promise is that the
+     content lands over the ending, so the timeline has to get there — but a
+     seek to the last frame is only free once that frame is on the device.
+     Before that it is a request for the tail of the file: Safari waits on it
+     and, from a server that will not answer a byte range, waits forever, the
+     picture frozen on whatever frame it had; Chromium re-downloads from the
+     top to reach it. Both are what "the video freezes and does not continue"
+     looks like on a phone, where the swipe almost always comes before the
+     1.6 MB has landed.
+
+     So the cut is taken only when the end is buffered. Otherwise the clip is
+     asked to hurry — play on at HURRY_RATE, which needs nothing but the bytes
+     already arriving in order — and it settles through `ended` like an
+     unhurried one does. If play() is refused (no gesture yet, Opera Mobile)
+     there is nothing to hurry, and the seek is issued after all: it is then a
+     paused element seeking, which is the one case the stall watchdog below
+     can still rescue by parking on the nearest frame that is here. */
+  function skipIntro() {
+    if (introSettled || hurrying) return;
+    removeEventListener("scroll", watchForSkip);
+    announceScrub();
+
+    if (lastFrameBuffered()) {
+      settleOnLastFrame(true);
+      return;
+    }
+
+    hurrying = true;
+    // The gate in startAutoplay() has nothing left to start.
+    introStarted = true;
+    try {
+      video.playbackRate = HURRY_RATE;
+    } catch {
+      video.playbackRate = 2;
+    }
+    tryPlay(() => settleOnLastFrame(true));
   }
 
   const onIntroEnded = () => settleOnLastFrame(false);
   const watchForSkip = () => {
-    if (readProgress() > HOLD_SKIP_EPSILON) settleOnLastFrame(true);
+    if (readProgress() > HOLD_SKIP_EPSILON) skipIntro();
   };
+
+  /* ---- Stall watchdog ("hold" only) ---------------------------------------
+     Sampled from the scrub loop, so it costs nothing while nothing should be
+     moving. Two things can be stuck: playback the browser accepted but cannot
+     feed (media time frozen, element not paused), and the settle seek waiting
+     on bytes that are not coming. Either way, after STALL_MS the visitor has
+     long since decided the video is broken, and the one useful thing left is
+     to stop waiting: park on the nearest frame that is on the device and let
+     the page be a page. The clip never plays out — but it was not going to.
+  ------------------------------------------------------------------------ */
+
+  let stallTime = -1;
+  let stallSince = 0;
+
+  function watchForStall(now) {
+    const playing =
+      introStarted && !introSettled && !video.paused && !video.ended;
+    const parking = introSettled && video.seeking;
+    if (!playing && !parking) {
+      stallTime = -1;
+      return;
+    }
+    const t = video.currentTime;
+    if (t !== stallTime) {
+      stallTime = t;
+      stallSince = now;
+      return;
+    }
+    if (now - stallSince < STALL_MS) return;
+    stallSince = now;
+    giveUp();
+  }
+
+  function giveUp() {
+    settleOnLastFrame(false);
+    if (duration > 0) {
+      video.currentTime = clampToBuffered(Math.max(duration - FRAME, 0));
+    }
+  }
 
   if (HOLD) video.addEventListener("ended", onIntroEnded);
 
@@ -376,13 +504,56 @@ export function initScrollVideo({
      is where the content is supposed to arrive over either way.
   ------------------------------------------------------------------------ */
 
+  /* play() starts the moment the next frame or two are decodable, and on a
+     phone that is the wrong moment: with the file still arriving over a
+     cellular link the intro sets off and then freezes the first time the
+     decoder catches up with the download. `canplaythrough` is the browser's
+     own estimate that it can now reach the end without stalling, so the
+     start waits for it — the poster is already up and a beat on it costs
+     nothing, while a stop mid-shot is the one thing this page cannot afford.
+
+     Two things end the wait early. `suspend` means the browser has stopped
+     fetching on its own — iOS treats preload as a hint and loads no further
+     than metadata until play() is called — so waiting on it would only ever
+     run out the clock. And the clock: the estimate is not a promise, and no
+     engine gets to hold the poster indefinitely. */
+  const PLAYABLE_WAIT_MS = 2500;
+  const HAVE_ENOUGH_DATA = 4;
+
+  function whenPlayable(callback) {
+    if (video.readyState >= HAVE_ENOUGH_DATA) {
+      callback();
+      return;
+    }
+    let timer = 0;
+    const go = () => {
+      clearTimeout(timer);
+      video.removeEventListener("canplaythrough", go);
+      video.removeEventListener("suspend", go);
+      callback();
+    };
+    timer = setTimeout(go, PLAYABLE_WAIT_MS);
+    video.addEventListener("canplaythrough", go);
+    video.addEventListener("suspend", go);
+  }
+
   function startAutoplay() {
     video.playbackRate = playbackRate;
-    tryPlay(retryOnGesture);
+    whenPlayable(() => {
+      // Skipped or settled while the clip was still arriving — or skipped
+      // into a hurry, which issued the play() itself.
+      if (!introPending() || introStarted) return;
+      introStarted = true;
+      tryPlay(retryOnGesture);
+    });
   }
 
   /** play(), with a refused earlier attempt cleared once one succeeds. */
   function tryPlay(onRefused) {
+    // Muted from script as well as from markup. The attribute alone has a
+    // history of not being honoured by the autoplay check in some Chromium
+    // builds, and an unmuted play() is refused everywhere without a gesture.
+    video.muted = true;
     const attempt = video.play();
     if (!attempt || typeof attempt.then !== "function") return;
     attempt.then(() => {
@@ -413,8 +584,22 @@ export function initScrollVideo({
      one gets a single quiet retry, and only a second rejection is treated as
      the browser meaning it. */
 
-  const GESTURE_EVENTS = ["pointerup", "touchend", "keydown"];
+  /* `click` alongside the pointer and touch events: it is the one event every
+     engine agrees carries user activation, and on a phone a tap arrives as
+     all three in a row — pointerup, touchend, click — so the retry has to
+     treat that burst as one gesture, not three attempts. */
+  const GESTURE_EVENTS = ["pointerup", "touchend", "click", "keydown"];
+  const GESTURE_BURST_MS = 400;
+  /* How many refused gestures before the poster is given up on. Opera Mobile
+     refuses the gesture-less play() and, on some devices, the first
+     gesture-backed one as well; a second tap has been seen to go through.
+     Parking on the last frame after one refusal turned every such visit into
+     "the video never played" — so the prompt stays up, and each tap tries
+     again, until this many have been refused. */
+  const GESTURE_ATTEMPTS = 4;
   let gestureRetryArmed = false;
+  let gestureAttempts = 0;
+  let lastGestureAt = -Infinity;
   let autoplayRefused = false;
   let abortRetried = false;
 
@@ -455,14 +640,23 @@ export function initScrollVideo({
     }
   }
 
-  function onFirstGesture() {
-    disarmGestureRetry();
-    if (HOLD && introSettled) return;
-    if (REWIND && phase !== PLAYING) return;
-    tryPlay(parkAtEnd);
+  function onFirstGesture(event) {
+    if ((HOLD && introSettled) || (REWIND && phase !== PLAYING)) {
+      disarmGestureRetry();
+      return;
+    }
+    const at = event?.timeStamp ?? performance.now();
+    if (at - lastGestureAt < GESTURE_BURST_MS) return;
+    lastGestureAt = at;
+
+    gestureAttempts++;
+    // Success disarms in tryPlay(); a refusal keeps the prompt and the
+    // listeners up for the next tap, until the budget is spent.
+    tryPlay(gestureAttempts >= GESTURE_ATTEMPTS ? parkAtEnd : () => {});
   }
 
   function parkAtEnd() {
+    disarmGestureRetry();
     if (HOLD) {
       settleOnLastFrame(true);
       return;
@@ -514,6 +708,7 @@ export function initScrollVideo({
        journey through the section, so showing it there would fill the bar
        before the visitor had moved and then have to empty it again. */
     if (HOLD) {
+      watchForStall(time);
       updateBar(progress);
       onScrubProgress?.(progress);
       rafId = requestAnimationFrame(frame);
@@ -577,7 +772,7 @@ export function initScrollVideo({
       // the intro is still the thing running. Once "hold" has settled, the
       // paused element IS the finished state, and resuming it would replay the
       // clip out from under the content sitting on top of it.
-      if (introPending()) {
+      if (introPending() && introStarted) {
         if (onScreen && video.paused && !video.ended) {
           tryPlay(() => {});
         } else if (!onScreen && !video.paused) {
@@ -600,7 +795,7 @@ export function initScrollVideo({
   function onVisibilityChange() {
     syncLoop();
     if (document.visibilityState !== "visible") return;
-    if (introPending() && onScreen && video.paused && !video.ended) {
+    if (introPending() && introStarted && onScreen && video.paused && !video.ended) {
       tryPlay(retryOnGesture);
     }
   }
@@ -652,7 +847,7 @@ export function initScrollVideo({
       startAutoplay();
     }
   } else {
-    onScrubStart?.();
+    announceScrub();
     syncLoop();
   }
 

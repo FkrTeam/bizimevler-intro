@@ -163,8 +163,13 @@ gerekmiyor.
 `"hold"` modunun tek kararı: **klip hâlâ oynarken kaydırılırsa ne olur?**
 Oynamaya devam etmesine izin verilse kartlar klibin ortasındaki rastgele bir
 karenin üstüne açılırdı — modun vaat etmediği tek şey bu. Bu yüzden bölümün
-başından belirgin bir kaydırma (%6) "izlemeyi bıraktım" olarak okunur ve zaman
-çizgisi o anda son kareye park edilir. Beklerseniz hiçbir şey atlanmaz.
+başından belirgin bir kaydırma (fare için %6, dokunmatik ekranda %14 — bir
+başparmağın camda kendiliğinden ürettiği 50px "devam et" değildir) "izlemeyi
+bıraktım" olarak okunur. Son kare inmişse zaman çizgisi o anda oraya park
+edilir; inmemişse klip **3× hızla sona koşar** ve `ended` ile yerleşir — çünkü
+gelmemiş baytlara seek, Safari'de sonsuza kadar bekleyen, Chromium'da dosyayı
+baştan indirten bir istektir, yani telefonda "video dondu, devam etmiyor".
+Beklerseniz hiçbir şey atlanmaz.
 
 `"rewind"` modunda çözülen asıl sorun **devir teslim**: ~10 saniyelik bir klip
 çoğu ziyaretçi tarafından bitmeden kaydırılır. "Önce bitsin" derseniz, kaydırdığı
@@ -198,7 +203,7 @@ bırakır. Bu yüzden dar ekranlar aynı klibin **yeniden kodlanmışını** de�
 Teslimat `<source media>` ile:
 
 ```html
-<source src="./be-v11-mobile.mp4" type="video/mp4" media="(max-width: 719px)" />
+<source src="./be-v12-mobile.mp4" type="video/mp4" media="(max-width: 719px)" />
 <source src="./be-v11.mp4"        type="video/mp4" />
 ```
 
@@ -212,10 +217,14 @@ takasın doğru tarafı — alternatifi, yalnızca pencere sürüklenirken doğa
 durumu düzeltmek için megabaytlarca dosyayı ikinci kez indirmek.
 
 `poster` **attribute'u kullanılmıyor**: tek dosya alır, dikey kadrajın kendi
-posteri gerekir. İkisi de `--film-poster` olarak token'a yazılır (dikey olan
-config'in verdiği media query altında) ve `.film__video`'nun arka planı olarak
-boyanır. Böylece breakpoint tek yerde — `template.config.js` — yaşar; markup ile
-stil onun üzerinde ayrışamaz.
+posteri gerekir. İkisi de build'de `index.html`'in satır içi `<style>` bloğuna
+`.film__video{background-image}` kuralı olarak yazılır (dikey olan config'in
+verdiği media query altında). Custom property olarak değil: bir custom
+property içindeki `url()` `var()`'ın yerleştirildiği yerde çözülür, o da
+`/assets/` altındaki hash'li stylesheet — göreli poster yolu `/assets/poster.jpg`
+olarak istenip 404 dönüyordu, yani telefonda klip gelene kadar siyah ekran.
+Böylece breakpoint tek yerde — `template.config.js` — yaşar; markup ile stil
+onun üzerinde ayrışamaz.
 
 ---
 
@@ -244,13 +253,35 @@ ikisinin de sonunda donmuş bir kuyruk vardı. Ölçümler:
 | gerçek kadans | **24**, temiz kopyalarla 30'a doldurulmuş | **30**, blend'lenmiş 24→30 |
 | ölü kuyruk | 2.96 sn (183. kareden sonra donuk) | 1.33 sn |
 | çıktı | 190 kare · 7.92 sn · 24 fps | 285 kare · 9.50 sn · 30 fps |
-| ayar | crf 20 · GOP 48 · veryslow | crf 20 · GOP 60 · veryslow |
-| boyut | 9.28 MB | 3.24 MB |
-| VMAF | 98.16 / tavan **98.56** | 98.75 / tavan **99.65** |
+| ayar | crf 20 · GOP 48 · level 4.0 · veryslow | crf 26 · GOP 60 · level 3.1 · veryslow |
+| boyut | 9.28 MB | 1.64 MB |
+| VMAF | 98.16 / tavan **98.56** | 97.28 / tavan **99.65** |
 
 Geniş kadrajın kopyaları temiz olduğu için `decimate=cycle=5` ile ayıklandı.
 Dikey kadrajınkiler **blend'lenmiş** — bilgi karışmış, geri alınamaz — o yüzden
 o klip kendi doğal 30 fps'inde kalıyor.
+
+**Dikey kadraj crf 26'da, 20'de değil.** 500×900 için crf 20'nin ürettiği
+2.85 Mbps, çözünürlüğe göre çok cömertti (0.21 bit/piksel) ve bir telefonun
+hücresel bağlantısında girişin ortasında donmanın sebebi tam olarak buydu:
+indirme çözücüye yetişemiyor. Ölçüm, aynı ayar setiyle yalnızca crf'yi
+değiştirerek:
+
+| crf | boyut | VMAF |
+|---|---|---|
+| 20 (eski) | 3.24 MB | 98.75 |
+| 22 | 2.58 MB | 98.39 |
+| 24 | 2.06 MB | 97.93 |
+| **26** | **1.64 MB** | **97.28** |
+| 28 | 1.30 MB | 96.34 |
+
+97'nin üstü telefon ekranında ayırt edilemez; crf 26 dosyayı yarıya indirip
+oradan çıkmıyor. VBV tavanı (`-maxrate`) denendi, aynı boyutta daha düşük
+VMAF verdi — ilk üç saniyenin bayt yoğunluğu klibin en hareketli yerinden
+geliyor ve orayı sıkıştırmak görünür; başlangıçtaki yükü ağ yerine oynatıcı
+karşılıyor (bkz. "Oynatıcı", tamponlu başlangıç). Level 3.1, 4.0 değil: bu
+çözünürlük ve hız 3.1'e sığıyor ve 3.1 en eski telefon donanım çözücülerinin
+bile kabul ettiği seviye.
 
 Tavanların 100 olmadığına dikkat: her iki master da zaten ~10 Mbps H.264, yani
 kayıplı. Kalibrasyon yapmadan "98 aldık" cümlesi anlamsız; burada 98.16, tavanın
@@ -282,14 +313,14 @@ ffmpeg -y -i be-1.mp4 -vf "decimate=cycle=5" -frames:v 190 -an \
 
 # dikey kadraj
 ffmpeg -y -i be-mobil.mp4 -frames:v 285 -an \
-  -c:v libx264 -profile:v high -level 4.0 -refs 4 -preset veryslow \
-  -crf 20 -g 60 -keyint_min 60 -sc_threshold 0 -pix_fmt yuv420p \
-  -movflags +faststart public/be-v11-mobile.mp4
+  -c:v libx264 -profile:v high -level 3.1 -refs 4 -preset veryslow \
+  -crf 26 -g 60 -keyint_min 60 -sc_threshold 0 -pix_fmt yuv420p \
+  -movflags +faststart public/be-v12-mobile.mp4
 
 # posterler (ilk kare)
 ffmpeg -y -i public/be-v11.mp4 -vf "select=eq(n\,0),scale=1024:-2" \
   -frames:v 1 -q:v 6 public/poster.jpg
-ffmpeg -y -i public/be-v11-mobile.mp4 -vf "select=eq(n\,0),scale=500:-2" \
+ffmpeg -y -i public/be-v12-mobile.mp4 -vf "select=eq(n\,0),scale=500:-2" \
   -frames:v 1 -q:v 6 public/poster-mobile.jpg
 
 # kart görselleri
@@ -434,6 +465,31 @@ Ayrıca: bölüm ekran dışındayken döngü tamamen duruyor · iOS'ta hiç oyn
 video kare boyamadığı için muted play/pause ile decoder primeleniyor · ilerleme
 çubuğu 1000 adımda ve `scaleX` ile güncelleniyor.
 
+**Tamponlu başlangıç.** `play()` bir-iki kare çözülebilir olur olmaz başlar;
+hücresel bağlantıda bu, girişin yola çıkıp çözücü indirmeye yetiştiği ilk anda
+donması demek. Oynatıcı bunun yerine `canplaythrough`'u — tarayıcının "sona
+kadar takılmadan oynatabilirim" tahmini — bekliyor. Poster zaten ekranda, bir
+nefes daha durması bedelsiz; çekimin ortasında donmaksa bu sayfanın
+kaldıramayacağı tek şey. Bekleme 2.5 sn ile sınırlı ve tarayıcı kendi kendine
+indirmeyi bıraktıysa (`suspend` — iOS, `play()` çağrılana kadar metadata'dan
+öteye gitmez) hemen başlıyor; yani tahmin gelmese de poster süresiz kalmıyor.
+Ekrana dönüş ve sekmeye dönüş yolları bu kapıyı atlamıyor: ilk `play()`
+çağrılana kadar devam ettirecek bir şey yok.
+
+**Takılma bekçisi.** Oynatma kabul edildiği hâlde medya zamanı 6 sn boyunca
+kıpırdamıyorsa, ya da yerleşme seek'i o kadar süre veri bekliyorsa, veri
+gelmiyor demektir. Bekçi beklemeyi bırakır: cihazda olan en yakın kareye park
+eder ve sayfayı sayfa olmaya bırakır. Klip bitmez — ama zaten bitmeyecekti.
+
+**Mobilde ölçülen üç maliyet daha.** İlerleme kesri `innerHeight`'a değil
+yapışkan kutunun kendi yüksekliğine (`lvh`) bölünüyor — adres çubuğu ilk
+kaydırmada çekilince `innerHeight` büyür ve kesir jestin ortasında sıçrardı.
+Poster, ilk kare ekrana geldiği anda (`requestVideoFrameCallback`) arka
+plandan kaldırılıyor: opak videonun altında tam ekran bir katmanı her karede
+boşuna harmanlamak telefon GPU'sunun hissettiği bir yük. Görünmez ipucunun
+kayan parçası, ipucu görünene kadar `animation-play-state: paused` — aksi
+hâlde klip boyunca her karede compositor'a boşa bir tik.
+
 ---
 
 ## Erişilebilirlik
@@ -477,8 +533,13 @@ da çalışır), `vercel.json`, `deploy/nginx.conf`, `public/.htaccess` (Apache)
 bir sunucudan video oynatmaz; Chromium ise her seek'te dosyayı baştan indirir.
 Apache, nginx, Vercel ve Netlify bunu kendiliğinden yapar. Cloudflare'in statik
 dosya servisi yapmaz — `worker/index.js` bu yüzden var: `.mp4` istekleri
-(`run_worker_first`) Worker'a düşer, o da dosyayı dilimleyip `206` döner. Yerelde
-denemek için `npx wrangler dev`, sonra:
+(`run_worker_first`) Worker'a düşer, o da dosyayı dilimleyip `206` döner.
+Dosya okunduktan sonra isolate'in belleğinde tutulur: bir telefon klibi bir
+kez istemez — Safari iki baytlık bir sondayla başlar, sonra dosyayı parça
+parça yürür; Chromium her seek'te ve tamponu her boşaldığında yeni bir range
+açar. Her birine tam bir asset okuması ödemek, girişi mobilde dur-kalk yapan
+şeydi; şimdi ilkinden sonrası bellekten dilim. Yerelde denemek için
+`npx wrangler dev`, sonra:
 
 ```bash
 curl -sI -H "Range: bytes=0-1023" http://127.0.0.1:8787/be-v11.mp4
@@ -502,7 +563,11 @@ Panel "oynamıyor" şikâyetini de ayırır: `state`, `last event`, `error` ve
 alttaki olay günlüğü. `play() REJECTED NotAllowedError` → otomatik oynatma
 politikası (Opera Mobile, iOS Düşük Güç Modu, veri tasarrufu); oynatıcı bu
 durumda posteri tutar, ipucu `promptTap` metnine ("İzlemek için dokunun") döner
-ve ilk dokunuşta yeniden dener. `play() REJECTED AbortError ... background
+ve her dokunuşta yeniden dener — dört dokunuş da reddedilirse son kareye park
+eder. Panel her dokunuşu `pointerup on <div> trusted=true active=true` biçiminde
+günlükler: dokunuş sayfaya ulaşmış mı (`trusted`, hedef eleman) ve tarayıcı o
+anda etkinleştirme sayıyor mu (`active`), "dokundum, olmadı" şikâyetini bu iki
+alan ayırır. `play() REJECTED AbortError ... background
 media was paused` → sayfa arka planda açıldı (pasif sekme, başka pencerenin
 arkasında kalan pencere); dokunma ipucu gösterilmez, sekme görünür olunca
 yeniden denenir. `error 3 DECODE` / `4 SRC_NOT_SUPPORTED` → kodek veya sunucu (byte-range

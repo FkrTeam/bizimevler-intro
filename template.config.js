@@ -68,7 +68,7 @@ export default {
        frame of slack either way is below what a seek resolves.
     ------------------------------------------------------------------ */
     portrait: {
-      src: "./be-v11-mobile.mp4",
+      src: "./be-v12-mobile.mp4",
       poster: "./poster-mobile.jpg",
       width: 500,
       height: 900,
@@ -86,9 +86,11 @@ export default {
      * "hold"    — clip autoplays once and stops on its last frame; scroll never
      *             touches the timeline, it only brings the content up over that
      *             frame. Scrolling while the clip is still running is taken as
-     *             "move on" and parks it on the last frame straight away, so
-     *             the cards always land over the ending — never over whatever
-     *             was mid-shot when the visitor decided to scroll.
+     *             "move on": if the ending has downloaded the clip cuts to it
+     *             straight away, otherwise it hurries there at 3x — so the
+     *             cards always land over the ending, never over whatever was
+     *             mid-shot when the visitor decided to scroll, and never wait
+     *             on a seek into bytes that have not arrived.
      * "rewind"  — clip autoplays forward, then scroll rewinds it to zero.
      * "forward" — no autoplay; scroll scrubs the clip from start to end.
      */
@@ -212,7 +214,7 @@ export default {
     items: [
       {
         name: "Bizim Evler 12",
-        href: "https://bizimevler.com.tr/landing_page_12/",
+        href: "https://bizimevler.com.tr/bizimevler12/",
         external: true,
         /* `width`/`height` describe the largest file: they exist to give the
            image its intrinsic ratio, and the ratio is the same at every size.
@@ -235,7 +237,7 @@ export default {
       },
       {
         name: "Bizim Evler 11",
-        href: "https://bizimevler.com.tr/landing_page_11/",
+        href: "https://bizimevler.com.tr/bizimevler11/",
         external: true,
         photo: {
           src: "/src/assets/projects/be11-800.webp",

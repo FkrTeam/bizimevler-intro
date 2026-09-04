@@ -156,11 +156,24 @@ ul {
   /* The poster is painted here rather than through the element's `poster`
      attribute, which takes a single file — and the portrait cut is framed
      differently enough that the wide poster over it would be the wrong
-     picture, not just a cropped one. Both URLs arrive as --film-poster, the
-     portrait one under the breakpoint, so this rule needs no media query of
-     its own. `cover` matches object-fit above, so the still and the first
-     decoded frame occupy exactly the same box and the handover is invisible. */
-  background: var(--bg) var(--film-poster, none) center / cover no-repeat;
+     picture, not just a cropped one. The image itself is declared in the
+     inline <style> that vite.config.js emits into index.html, the portrait
+     one under the breakpoint (see buildTokens for why it cannot come through
+     a custom property). Longhands here, deliberately: the `background`
+     shorthand would reset background-image and erase that declaration
+     whichever way the two sheets are ordered. `cover` matches object-fit
+     above, so the still and the first decoded frame occupy exactly the same
+     box and the handover is invisible. */
+  background-color: var(--bg);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* Once a frame is on screen the poster behind it is pure overdraw — see
+   retirePoster() in main.js for when this lands. */
+.film__video.has-frame {
+  background-image: none;
 }
 
 /* Wide cut: crop from the left, never the right.
@@ -351,6 +364,16 @@ ul {
   /* Matches the progress rule's transition, so the two indicators move as one
      mechanism rather than at two slightly different rates. */
   transition: transform 110ms linear;
+}
+
+/* The hint is invisible for the whole intro (see the reveal states below),
+   but its travelling segment would still be animating under opacity 0 —
+   a compositor tick every frame for the length of the clip, on the very
+   device where the decoder wants that budget. Held on its first keyframe
+   until the hint has something to show; it sits above the track there, so
+   the resume reads as the segment entering, not as a jump. */
+.js-anim .film__prompt:not(.is-active) .film__prompt-line::after {
+  animation-play-state: paused;
 }
 
 @keyframes prompt-travel {

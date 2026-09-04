@@ -33,6 +33,31 @@ if (flags.has("noblur")) document.documentElement.classList.add("no-blur");
 initDebug(video);
 
 /* ---------------------------------------------------------------------------
+   Poster retirement
+
+   The poster is the video element's CSS background, and a background under an
+   opaque video is a full-viewport layer the compositor blends for nothing on
+   every frame — the kind of overdraw a phone GPU feels during playback. It is
+   dropped the moment a frame has actually been presented: rVFC where it
+   exists, otherwise the first `playing` or `seeked`, the two events that put a
+   frame on screen. Not `loadeddata` — Safari holds a decodable-but-unplayed
+   element blank, and the poster would be pulled from under nothing.
+--------------------------------------------------------------------------- */
+
+function retirePoster() {
+  video.classList.add("has-frame");
+  video.removeEventListener("playing", retirePoster);
+  video.removeEventListener("seeked", retirePoster);
+}
+
+if (typeof video.requestVideoFrameCallback === "function") {
+  video.requestVideoFrameCallback(retirePoster);
+} else {
+  video.addEventListener("playing", retirePoster);
+  video.addEventListener("seeked", retirePoster);
+}
+
+/* ---------------------------------------------------------------------------
    Scroll-driven presentation
 
    Both the hint and the content are pure functions of scroll position rather
