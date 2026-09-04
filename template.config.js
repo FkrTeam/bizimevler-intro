@@ -19,7 +19,7 @@ export default {
      fps drives the seek tolerance, and the dimensions reserve the layout box.
   -------------------------------------------------------------------- */
   video: {
-    src: "./be-v11.mp4",
+    src: "./be-v13.mp4",
     poster: "./poster.jpg",
     width: 1920,
     height: 1000,
@@ -68,7 +68,7 @@ export default {
        frame of slack either way is below what a seek resolves.
     ------------------------------------------------------------------ */
     portrait: {
-      src: "./be-v12-mobile.mp4",
+      src: "./be-v13-mobile.mp4",
       poster: "./poster-mobile.jpg",
       width: 500,
       height: 900,

@@ -203,8 +203,8 @@ bırakır. Bu yüzden dar ekranlar aynı klibin **yeniden kodlanmışını** de�
 Teslimat `<source media>` ile:
 
 ```html
-<source src="./be-v12-mobile.mp4" type="video/mp4" media="(max-width: 719px)" />
-<source src="./be-v11.mp4"        type="video/mp4" />
+<source src="./be-v13-mobile.mp4" type="video/mp4" media="(max-width: 719px)" />
+<source src="./be-v13.mp4"        type="video/mp4" />
 ```
 
 Kaynak seçimi bir kez, indirme başlamadan önce yapılır — **telefon geniş dosyayı
@@ -302,25 +302,37 @@ Aynı VMAF'ta GOP 48 her seferinde daha küçük: uzun GOP baytı P-zincirine
 harcayıp kaliteyi düşürüyor, çok kısa GOP ise keyframe'e harcıyor. Son kareye
 zorlanmış bir keyframe denendi — %2.9 boyut karşılığı ~50 ms; alınmadı.
 
+**Aydınlatma, kodlamada.** İki master da orta parlaklıkta (ortalama luma
+120/255) ve sayfada koyu okunuyordu. Kaldırma `eq` filtresiyle dosyaya
+yazıldı — `gamma=1.18:brightness=0.03:contrast=1.02:saturation=1.03`,
+ortalama luma 120 → 140 — CSS `filter: brightness()` ile değil: tam ekran bir
+videoya filtre, telefonda her karede GPU maliyeti demek, kodlamada ise sıfır.
+Gamma tercih edildi çünkü düz bir `brightness` ofseti gökyüzünü patlatır;
+gamma gölgeleri kaldırıp beyazları yerinde bırakır. Kenar scrim'leri de aynı
+anda hafifletildi (`.film__scrim`), yoksa kodlamanın verdiğinin üçte birini
+geri alıyorlardı.
+
 Tekrar üretmek için:
 
 ```bash
+EQ="eq=gamma=1.18:brightness=0.03:contrast=1.02:saturation=1.03"
+
 # geniş kadraj
-ffmpeg -y -i be-1.mp4 -vf "decimate=cycle=5" -frames:v 190 -an \
+ffmpeg -y -i be-1.mp4 -vf "decimate=cycle=5,$EQ" -frames:v 190 -an \
   -c:v libx264 -profile:v high -level 4.0 -refs 4 -preset veryslow \
   -crf 20 -g 48 -keyint_min 48 -sc_threshold 0 -pix_fmt yuv420p \
-  -movflags +faststart public/be-v11.mp4
+  -movflags +faststart public/be-v13.mp4
 
 # dikey kadraj
-ffmpeg -y -i be-mobil.mp4 -frames:v 285 -an \
+ffmpeg -y -i be-mobil.mp4 -vf "$EQ" -frames:v 285 -an \
   -c:v libx264 -profile:v high -level 3.1 -refs 4 -preset veryslow \
   -crf 26 -g 60 -keyint_min 60 -sc_threshold 0 -pix_fmt yuv420p \
-  -movflags +faststart public/be-v12-mobile.mp4
+  -movflags +faststart public/be-v13-mobile.mp4
 
 # posterler (ilk kare)
-ffmpeg -y -i public/be-v11.mp4 -vf "select=eq(n\,0),scale=1024:-2" \
+ffmpeg -y -i public/be-v13.mp4 -vf "select=eq(n\,0),scale=1024:-2" \
   -frames:v 1 -q:v 6 public/poster.jpg
-ffmpeg -y -i public/be-v12-mobile.mp4 -vf "select=eq(n\,0),scale=500:-2" \
+ffmpeg -y -i public/be-v13-mobile.mp4 -vf "select=eq(n\,0),scale=500:-2" \
   -frames:v 1 -q:v 6 public/poster-mobile.jpg
 
 # kart görselleri
@@ -542,7 +554,7 @@ açar. Her birine tam bir asset okuması ödemek, girişi mobilde dur-kalk yapan
 `npx wrangler dev`, sonra:
 
 ```bash
-curl -sI -H "Range: bytes=0-1023" http://127.0.0.1:8787/be-v11.mp4
+curl -sI -H "Range: bytes=0-1023" http://127.0.0.1:8787/be-v13.mp4
 # beklenen: HTTP/1.1 206 Partial Content, Content-Range: bytes 0-1023/<boyut>
 ```
 

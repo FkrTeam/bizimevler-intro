@@ -194,24 +194,27 @@ ul {
 }
 
 /* Just enough darkening at the two edges to keep the logo and the hint legible
-   over any frame. The middle of the picture is left completely alone. */
+   over any frame. The middle of the picture is left completely alone.
+   Lightened when the clip itself was lifted (see README, "aydınlatma"): the
+   footage was asked to read brighter, and a heavy grade at the edges was
+   taking back a third of what the encode gave. */
 .film__scrim {
   z-index: 1;
   position: absolute;
   inset: 0;
   background: linear-gradient(
       to bottom,
-      color-mix(in srgb, var(--bg) 55%, transparent) 0%,
-      transparent 22%
+      color-mix(in srgb, var(--bg) 40%, transparent) 0%,
+      transparent 20%
     ),
     /* Deeper and reaching higher than the top edge needs to. The prompt and
        the progress bar both live down here, and the footage under them is
        often bright daylight city — the earlier falloff left them stranded. */
     linear-gradient(
       to top,
-      color-mix(in srgb, var(--bg) 82%, transparent) 0%,
-      color-mix(in srgb, var(--bg) 34%, transparent) 15%,
-      transparent 36%
+      color-mix(in srgb, var(--bg) 66%, transparent) 0%,
+      color-mix(in srgb, var(--bg) 24%, transparent) 15%,
+      transparent 32%
     );
 }
 
