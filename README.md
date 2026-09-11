@@ -173,7 +173,7 @@ Bu daha önce "son kare inmişse seek, inmemişse 3× hızla sona koş" idi. Ko�
 çoktan gelmiş oluyordu — sayfa kaydırmayı reddediyormuş gibi okunuyordu. Seek
 doğru cevap, ama tek şartla: sunucu byte-range yanıtlamalı (bkz. "Sunucu").
 Klibin sonu sabit bir kare olduğu için son GOP küçük — v14'te geniş kadrajda
-0.8 MB, dikeyde 0.3 MB (ölçüldü: son keyframe'den dosya sonuna) — ve o aralık
+0.6 MB, dikeyde 0.25 MB (ölçüldü: son keyframe'den dosya sonuna) — ve o aralık
 isteği 4G'de bir saniyenin altında iner. Range vermeyen bir
 sunucuda seek gelmeyecek baytları beklerdi (Safari sonsuza kadar, Chromium
 dosyayı baştan indirerek); o yüzden park seek'inin kendi kısa bekçisi var
@@ -274,9 +274,9 @@ sonrası proje pinlerinin tek tek belirdiği sabit bir kompozisyon. Ölçümler:
 | gerçek kadans | **24**, temiz — kopya yok | ilk 150 kare: **24**, temiz kopyalarla 30'a doldurulmuş · son 180 kare: gerçek 30 fps'lik kamera hareketi |
 | ölü kuyruk | ~1 sn (son pin 240. karede iner) — **kesilmedi**, bkz. aşağı | yok — pan son kareye kadar yavaşlayarak durur |
 | çıktı | 264 kare · 11.00 sn · 24 fps | 263 kare · 10.96 sn · 24 fps |
-| ayar | crf 16 · GOP 48 · level 4.0 · veryslow | crf 20 · GOP 48 · level 4.0 · veryslow |
-| boyut | 19.62 MB (ilk 5 sn: 14.6 MB) | 6.17 MB (ilk 5 sn: 4.3 MB) |
-| VMAF | 97.94 / tavan **98.93** | 99.90 / tavan **99.98** |
+| ayar | crf 18 · GOP 48 · level 4.0 · veryslow | crf 22 · GOP 48 · level 4.0 · veryslow |
+| boyut | 15.66 MB (ilk 5 sn: 11.7 MB) | 4.80 MB (ilk 5 sn: 3.4 MB) |
+| VMAF | 97.73 / tavan **98.93** | 99.78 / tavan **99.98** |
 
 **Dikey kadraj iki yarım, iki ayrı işlem.** Kare farkı profili (aşağıdaki
 `tblend` komutu) ilk 150 karede istisnasız her beşinci karede sıfır veriyor:
@@ -299,50 +299,51 @@ bir sebep yok — geniş kadraj da 24.
 lumada; aynı filtreyi uygulamak gökyüzünü patlatırdı. Scrim'ler v13'teki hafif
 hâlinde kaldı.
 
-**Geniş kadraj crf 16 — pratik tavan.** Tavan 98.93; tam merdiven:
+**Geniş kadraj crf 18.** Tavan 98.93; tam merdiven:
 
 | crf | boyut | VMAF | tavana |
 |---|---|---|---|
 | 12 | 30.69 MB | 98.27 | −0.66 |
 | 14 | 24.51 MB | 98.11 | −0.82 |
-| **16** | **19.62 MB** | **97.94** | **−0.99** |
-| 18 | 15.66 MB | 97.73 | −1.20 |
+| 16 | 19.62 MB | 97.94 | −0.99 |
+| **18** | **15.66 MB** | **97.73** | **−1.20** |
 | 20 | 12.41 MB | 97.49 | −1.44 |
 | 22 | 9.74 MB | 97.17 | −1.76 |
 
 İlk teslim crf 22 idi (v13'ün 9.3 MB bütçesi); "daha kaliteli" isteğiyle
-kademe kademe yukarı alındı ve "tavana çek" denince 12'ye kadar ölçüldü. Eğri
-tavana **hiç ulaşmıyor**: 30 MB'da bile 0.66 puan eksik, çünkü master zaten
-~18 Mbps kayıplı H.264 ve kayıp geri gelmiyor — kalan fark kaynağın, kodlamanın
-değil. 16'nın üstünde her iki crf adımı ~5 MB isteyip 0.17 puan veriyor, yani
-1080p'de bir masaüstü mesafesinden ayırt edilemeyen bir fark için dosya
-yarı yarıya büyüyor. crf 16 bu yüzden pratik tavan.
+kademe kademe yukarı alındı, "tavana çek" denince 12'ye kadar ölçüldü ve
+crf 16 bir süre yayında kaldı; sonra 18'e geri dönüldü — 16'nın 4 MB fazlası
+1080p'de görünmüyordu, indirmede görünüyordu. Eğri tavana **hiç ulaşmıyor**:
+30 MB'da bile 0.66 puan eksik, çünkü master zaten ~18 Mbps kayıplı H.264 ve
+kayıp geri gelmiyor — kalan fark kaynağın, kodlamanın değil. 18'in üstünde her
+iki crf adımı ~4-6 MB isteyip ~0.2 puan veriyor.
 
-Bedeli indirme: baytların %75'i ilk 5 saniyede (23 Mbps, ortalama 14 Mbps).
+Bedeli indirme: baytların %75'i ilk 5 saniyede (18.7 Mbps, ortalama 11.4 Mbps).
 Ortalama bir ev bağlantısında sorunsuz; yavaş bir hatta giriş `canplaythrough`
 beklemesine takılırsa ziyaretçi kaydırdığı an klip son kareye atlar (bkz.
 "hold" modu). ~1 saniyelik kuyruk kesilmedi: `"hold"` modunda klip son karede
 duruyor ve o saniye pinlerin okunması için bir nefes; kesmek yalnızca birkaç
 KB kazandırırdı.
 
-**Dikey kadraj crf 20 — tavan.** Tavan 99.98; tam merdiven:
+**Dikey kadraj crf 22.** Tavan 99.98; tam merdiven:
 
 | crf | boyut | VMAF | tavana |
 |---|---|---|---|
 | 16 | 10.26 MB | 99.94 | −0.04 |
 | 18 | 7.96 MB | 99.93 | −0.05 |
-| **20** | **6.17 MB** | **99.90** | **−0.08** |
-| 22 | 4.80 MB | 99.78 | −0.20 |
+| 20 | 6.17 MB | 99.90 | −0.08 |
+| **22** | **4.80 MB** | **99.78** | **−0.20** |
 | 24 | 3.74 MB | 99.47 | −0.51 |
 | 26 | 2.93 MB | 98.74 | −1.24 |
 | 27 | 2.61 MB | 98.23 | −1.75 |
 | 28 | 2.32 MB | 97.52 | −2.46 |
 
-Burada eğri gerçekten doyuyor: 20'den 16'ya dosya %66 büyüyüp 0.04 puan
-alıyor. crf 20 tavanın 0.08 altında, ölçüm gürültüsü seviyesinde — telefon için
-tavan bu. v13'ün 1.64 MB'ının 3.8 katı ama piksel 2.6 katı (900×1300, 500×900
+Eğri 20 civarında doyuyor (20'den 16'ya dosya %66 büyüyüp 0.04 puan alıyor);
+crf 20 bir süre yayında kaldı, sonra geniş kadrajla birlikte bir kademe geri
+alındı: 22 tavanın 0.2 altında, 1.4 MB daha hafif ve telefonda ayırt
+edilemiyor. v13'ün 1.64 MB'ının ~3 katı ama piksel 2.6 katı (900×1300, 500×900
 değil): üç kat DPR'li bir telefonda `object-fit: cover` bu kaynağı ~2× büyütüyor,
-500 piksellik kaynak 3.5× büyürdü. Ortalama 4.5 Mbps, ilk 5 sn 6.9 Mbps — 4G'de
+500 piksellik kaynak 3.5× büyürdü. Ortalama 3.5 Mbps, ilk 5 sn 5.4 Mbps — 4G'de
 sorunsuz, zayıf 3G'de girişin ortasında tamponlama olabilir; oynatıcının
 tamponlu başlangıcı ve kaydırınca son kareye atlaması bunu karşılıyor. Level 3.1 artık yetmiyor (900×1300 = 4674 makroblok, 3.1'in
 tavanı 3600); level 4.0 her 1080p telefonun donanım çözücüsünde var.
@@ -362,7 +363,7 @@ X264="-c:v libx264 -profile:v high -level 4.0 -refs 4 -preset veryslow \
 # geniş kadraj — kaynak zaten 24 fps
 ffmpeg -y -i _source/be-wide-2026-09.mp4 -an -c:v libx264 -qp 0 -preset ultrafast \
   -pix_fmt yuv420p -r 24 -fps_mode cfr wide-lossless.mp4
-ffmpeg -y -i wide-lossless.mp4 -an $X264 -crf 16 public/be-v14.mp4
+ffmpeg -y -i wide-lossless.mp4 -an $X264 -crf 18 public/be-v14.mp4
 
 # dikey kadraj — ilk 150 kare decimate, kalan pan minterpolate, 24 fps'te birleştir
 ffmpeg -y -i _source/be-mobil-2026-09.mp4 -an -filter_complex \
@@ -371,7 +372,7 @@ ffmpeg -y -i _source/be-mobil-2026-09.mp4 -an -filter_complex \
         minterpolate=fps=24:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:me=epzs:vsbmc=1[b];
    [a][b]concat=n=2:v=1:a=0,setpts=N/24/TB[v]" -map "[v]" \
   -c:v libx264 -qp 0 -preset ultrafast -pix_fmt yuv420p -r 24 -fps_mode cfr mobil-lossless.mp4
-ffmpeg -y -i mobil-lossless.mp4 -an $X264 -crf 20 public/be-v14-mobile.mp4
+ffmpeg -y -i mobil-lossless.mp4 -an $X264 -crf 22 public/be-v14-mobile.mp4
 
 # VMAF (tavan için kayıpsız dosyayı kendisiyle karşılaştırın)
 ffmpeg -i public/be-v14.mp4 -i wide-lossless.mp4 -lavfi "[0:v][1:v]libvmaf" -f null -
