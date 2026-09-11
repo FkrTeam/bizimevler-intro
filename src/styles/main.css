@@ -271,33 +271,64 @@ ul {
      tight enough to read as a smudge behind the type; spreading it out and
      easing it off in two steps keeps the same legibility while looking like
      the photograph's own vignette. */
+  /* Softer than before: the text now carries its own plate (below), so this
+     only has to settle the descending line and blend the plate's edges into
+     the footage rather than hold the type up on its own. */
   background: radial-gradient(
     ellipse 52% 58% at 50% 50%,
-    rgb(0 0 0 / 0.52),
-    rgb(0 0 0 / 0.22) 45%,
+    rgb(0 0 0 / 0.34),
+    rgb(0 0 0 / 0.14) 45%,
     transparent 76%
   );
 }
 
+/* A frosted plate under the caption. The v14 footage puts the prompt over a
+   sunlit interchange, and the earlier answer — bigger, heavier, whiter type —
+   read as crude. The plate lets the type go back to caption scale and weight
+   while guaranteeing contrast; frosted rather than solid so it stays part of
+   the photograph, and a hairline instead of a shadow so it fits the page's
+   no-shadow rule. */
 .film__prompt-text {
   font-family: var(--font-mono);
-  /* Smaller and more widely tracked than before. At 0.95rem the line was
-     asserting itself like a heading; the register this page is written in
-     wants it to read as a caption — the smaller it gets, the more the
-     tracking does the work of making it deliberate. */
-  font-size: 0.78rem;
-  font-weight: 500;
-  letter-spacing: 0.34em;
+  font-size: clamp(0.68rem, 0.4vw + 0.55rem, 0.74rem);
+  font-weight: 600;
+  letter-spacing: 0.28em;
   /* Tracking adds a trailing space after the final letter, which throws
      centred text visibly left. Indenting by one tracking unit puts the
      optical centre back where the geometric one is. */
-  text-indent: 0.34em;
+  text-indent: 0.28em;
   text-transform: uppercase;
-  /* Not pure white. Against a dark grade, #fff is the one value that reads as
-     interface rather than as part of the photograph. */
-  color: rgb(255 255 255 / 0.9);
-  /* No text-shadow, by request. Legibility over the footage comes from the
-     bottom scrim and the radial darkening behind the prompt (::before). */
+  color: rgb(255 255 255 / 0.94);
+  padding: 0.72em 1.5em 0.66em;
+  border-radius: 999px;
+  border: 1px solid rgb(255 255 255 / 0.16);
+  background: color-mix(in srgb, var(--bg) 44%, transparent);
+  /* No text-shadow, by request. */
+}
+
+/* The blur is attached to the active state only, for the same reason the
+   card overlay's is (see .film__cards.is-interactive): the prompt is hidden
+   for the whole intro and a backdrop-filter under opacity 0 would still be
+   composited every frame while the decoder wants that budget. */
+.film__prompt.is-active .film__prompt-text {
+  -webkit-backdrop-filter: blur(12px) saturate(1.15);
+  backdrop-filter: blur(12px) saturate(1.15);
+}
+
+.no-blur .film__prompt.is-active .film__prompt-text {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: color-mix(in srgb, var(--bg) 62%, transparent);
+}
+
+/* Narrow screens: the line is nowrap and 23 characters long; tighter tracking
+   keeps the plate comfortably inside a 320px viewport. */
+@media (max-width: 719px) {
+  .film__prompt-text {
+    letter-spacing: 0.2em;
+    text-indent: 0.2em;
+    padding-inline: 1.2em;
+  }
 }
 
 /* A fixed hairline track with a lit segment descending inside it. The whole

@@ -19,20 +19,17 @@ export default {
      fps drives the seek tolerance, and the dimensions reserve the layout box.
   -------------------------------------------------------------------- */
   video: {
-    src: "./be-v13.mp4",
+    src: "./be-v14.mp4",
     poster: "./poster.jpg",
     width: 1920,
-    height: 1000,
+    height: 1080,
     /**
-     * 24, and this is the source's true rate rather than a conversion: the
-     * master arrived as 30fps with every fifth frame duplicated. Those copies
-     * were dropped with `decimate`, which picks the redundant frame in each
-     * cycle by content — a plain `fps=24` resample drops by timestamp and on
-     * this clip kept the copy and discarded the real frame.
+     * 24, the master's native rate this time: the v14 wide master arrived as
+     * clean 24 fps (no padded duplicates), so it ships frame for frame.
      */
     fps: 24,
     /** Seconds. Only used to size the scroll runway. */
-    duration: 7.917,
+    duration: 11,
     /**
      * Intro playback speed. The clip plays once at this rate before scroll
      * takes over. 1 = as encoded. Raising it shortens the wait before the
@@ -60,18 +57,17 @@ export default {
        `media` is also what the poster and aspect tokens are emitted
        under, so the breakpoint lives in exactly one place.
 
-       Note the frame rate differs from the wide cut: this master carries
-       a blended 24→30 conversion rather than clean duplicated frames, and
-       blended frames cannot be decimated back without losing real
-       information — so it ships at its native 30. Nothing reads
-       `video.fps` per source; it only sets the seek tolerance, and a
-       frame of slack either way is below what a seek resolves.
+       Same 24 fps as the wide cut. The v14 portrait master was 30 fps in
+       two halves: the aerial footage padded 24→30 with clean duplicates
+       (dropped with `decimate`), then a rendered 30 fps camera move over
+       the pin composition (converted with motion interpolation, which is
+       exact for a planar pan). See README "Bu projenin klipleri".
     ------------------------------------------------------------------ */
     portrait: {
-      src: "./be-v13-mobile.mp4",
+      src: "./be-v14-mobile.mp4",
       poster: "./poster-mobile.jpg",
-      width: 500,
-      height: 900,
+      width: 900,
+      height: 1300,
       media: "(max-width: 719px)",
     },
   },
@@ -86,11 +82,11 @@ export default {
      * "hold"    — clip autoplays once and stops on its last frame; scroll never
      *             touches the timeline, it only brings the content up over that
      *             frame. Scrolling while the clip is still running is taken as
-     *             "move on": if the ending has downloaded the clip cuts to it
-     *             straight away, otherwise it hurries there at 3x — so the
+     *             "move on": the clip cuts straight to its last frame — so the
      *             cards always land over the ending, never over whatever was
-     *             mid-shot when the visitor decided to scroll, and never wait
-     *             on a seek into bytes that have not arrived.
+     *             mid-shot when the visitor decided to scroll. The host must
+     *             serve byte ranges for that cut to be instant before the
+     *             file has fully arrived (it does: see worker/index.js).
      * "rewind"  — clip autoplays forward, then scroll rewinds it to zero.
      * "forward" — no autoplay; scroll scrubs the clip from start to end.
      */

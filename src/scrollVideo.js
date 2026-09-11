@@ -116,12 +116,14 @@ export function initScrollVideo({
   const COARSE =
     typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
   const HOLD_SKIP_EPSILON = COARSE ? 0.14 : 0.06;
-  /** "hold" only: how fast the clip runs to its end when it is skipped before
-   *  the end has downloaded. See skipIntro(). */
-  const HURRY_RATE = 3;
   /** Media time not moving for this long, while it should be, means the data
    *  is not coming. See watchForStall(). */
   const STALL_MS = 6000;
+  /** "hold" only: the settle seek's own, shorter patience. A skip is the
+   *  visitor saying "move on"; a seek to the last frame that has not landed
+   *  within this long is not going to, and the nearest frame that is here
+   *  is the better answer than a frozen mid-shot. See skipIntro(). */
+  const PARK_STALL_MS = 2500;
 
   /**
    * "hold" only. The intro is a one-shot: once it has ended or been skipped,
@@ -130,10 +132,6 @@ export function initScrollVideo({
    * `ended` false with nothing left to play.
    */
   let introSettled = false;
-  /** "hold" only. The visitor moved on before the end had downloaded, so the
-   *  clip is running to it at HURRY_RATE rather than seeking into data that
-   *  is not there yet. */
-  let hurrying = false;
   /** True once the intro's first play() has been issued — by the gate in
    *  startAutoplay(), or by a skip that hurried the clip. Until then the
    *  resume paths (section back on screen, tab back in front) have nothing
@@ -382,7 +380,6 @@ export function initScrollVideo({
   function settleOnLastFrame(seek) {
     if (introSettled) return;
     introSettled = true;
-    hurrying = false;
 
     removeEventListener("scroll", watchForSkip);
     video.pause();
@@ -402,53 +399,26 @@ export function initScrollVideo({
     announceScrub();
   }
 
-  /** True when the frame the intro settles on has already downloaded. */
-  function lastFrameBuffered() {
-    const ranges = video.buffered;
-    if (duration <= 0 || !ranges) return false;
-    const t = Math.max(duration - FRAME, 0);
-    for (let i = 0; i < ranges.length; i++) {
-      if (t >= ranges.start(i) - FRAME && t <= ranges.end(i) + FRAME) return true;
-    }
-    return false;
-  }
-
   /* The visitor scrolled on before the clip finished. The promise is that the
-     content lands over the ending, so the timeline has to get there — but a
-     seek to the last frame is only free once that frame is on the device.
-     Before that it is a request for the tail of the file: Safari waits on it
-     and, from a server that will not answer a byte range, waits forever, the
-     picture frozen on whatever frame it had; Chromium re-downloads from the
-     top to reach it. Both are what "the video freezes and does not continue"
-     looks like on a phone, where the swipe almost always comes before the
-     1.6 MB has landed.
+     content lands over the ending, so the timeline goes there now: a straight
+     seek to the last frame, whether or not that frame has downloaded yet.
 
-     So the cut is taken only when the end is buffered. Otherwise the clip is
-     asked to hurry — play on at HURRY_RATE, which needs nothing but the bytes
-     already arriving in order — and it settles through `ended` like an
-     unhurried one does. If play() is refused (no gesture yet, Opera Mobile)
-     there is nothing to hurry, and the seek is issued after all: it is then a
-     paused element seeking, which is the one case the stall watchdog below
-     can still rescue by parking on the nearest frame that is here. */
+     This used to be gated on the end being buffered, with a 3x "hurry" as
+     the fallback — but a hurry through an 11 s clip is still three or four
+     seconds of fast-forward under content that has already arrived, which
+     read as the page refusing the scroll. The seek is the right answer on
+     any host that serves byte ranges (see README, "Sunucu"): the ending is
+     a still, so its last GOP is a few hundred KB, and the request for it
+     lands in well under a second even over cellular. Where ranges are not
+     served the seek would wait on bytes that never come — so the settle
+     seek has its own short watchdog (PARK_STALL_MS) that parks on the
+     nearest frame already here instead. Either way the decoder is paused
+     from this moment; nothing keeps playing under the cards. */
   function skipIntro() {
-    if (introSettled || hurrying) return;
-    removeEventListener("scroll", watchForSkip);
-    announceScrub();
-
-    if (lastFrameBuffered()) {
-      settleOnLastFrame(true);
-      return;
-    }
-
-    hurrying = true;
+    if (introSettled) return;
     // The gate in startAutoplay() has nothing left to start.
     introStarted = true;
-    try {
-      video.playbackRate = HURRY_RATE;
-    } catch {
-      video.playbackRate = 2;
-    }
-    tryPlay(() => settleOnLastFrame(true));
+    settleOnLastFrame(true);
   }
 
   const onIntroEnded = () => settleOnLastFrame(false);
@@ -483,7 +453,7 @@ export function initScrollVideo({
       stallSince = now;
       return;
     }
-    if (now - stallSince < STALL_MS) return;
+    if (now - stallSince < (parking ? PARK_STALL_MS : STALL_MS)) return;
     stallSince = now;
     giveUp();
   }
@@ -540,8 +510,7 @@ export function initScrollVideo({
   function startAutoplay() {
     video.playbackRate = playbackRate;
     whenPlayable(() => {
-      // Skipped or settled while the clip was still arriving — or skipped
-      // into a hurry, which issued the play() itself.
+      // Skipped or settled while the clip was still arriving.
       if (!introPending() || introStarted) return;
       introStarted = true;
       tryPlay(retryOnGesture);

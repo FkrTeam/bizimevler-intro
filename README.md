@@ -165,11 +165,21 @@ Oynamaya devam etmesine izin verilse kartlar klibin ortasındaki rastgele bir
 karenin üstüne açılırdı — modun vaat etmediği tek şey bu. Bu yüzden bölümün
 başından belirgin bir kaydırma (fare için %6, dokunmatik ekranda %14 — bir
 başparmağın camda kendiliğinden ürettiği 50px "devam et" değildir) "izlemeyi
-bıraktım" olarak okunur. Son kare inmişse zaman çizgisi o anda oraya park
-edilir; inmemişse klip **3× hızla sona koşar** ve `ended` ile yerleşir — çünkü
-gelmemiş baytlara seek, Safari'de sonsuza kadar bekleyen, Chromium'da dosyayı
-baştan indirten bir istektir, yani telefonda "video dondu, devam etmiyor".
-Beklerseniz hiçbir şey atlanmaz.
+bıraktım" olarak okunur ve zaman çizgisi **o anda son kareye park edilir** —
+son kare henüz inmemiş olsa bile. Beklerseniz hiçbir şey atlanmaz.
+
+Bu daha önce "son kare inmişse seek, inmemişse 3× hızla sona koş" idi. Koşmak
+11 saniyelik klipte üç-dört saniye ileri sarma demekti ve o sırada kartlar
+çoktan gelmiş oluyordu — sayfa kaydırmayı reddediyormuş gibi okunuyordu. Seek
+doğru cevap, ama tek şartla: sunucu byte-range yanıtlamalı (bkz. "Sunucu").
+Klibin sonu sabit bir kare olduğu için son GOP küçük — v14'te geniş kadrajda
+0.8 MB, dikeyde 0.3 MB (ölçüldü: son keyframe'den dosya sonuna) — ve o aralık
+isteği 4G'de bir saniyenin altında iner. Range vermeyen bir
+sunucuda seek gelmeyecek baytları beklerdi (Safari sonsuza kadar, Chromium
+dosyayı baştan indirerek); o yüzden park seek'inin kendi kısa bekçisi var
+(`PARK_STALL_MS`, 2.5 sn): süre dolarsa cihazda olan en yakın kareye park
+eder. Her iki durumda da çözücü o andan itibaren duruyor, kartların altında
+hiçbir şey oynamıyor.
 
 `"rewind"` modunda çözülen asıl sorun **devir teslim**: ~10 saniyelik bir klip
 çoğu ziyaretçi tarafından bitmeden kaydırılır. "Önce bitsin" derseniz, kaydırdığı
@@ -203,8 +213,8 @@ bırakır. Bu yüzden dar ekranlar aynı klibin **yeniden kodlanmışını** de�
 Teslimat `<source media>` ile:
 
 ```html
-<source src="./be-v13-mobile.mp4" type="video/mp4" media="(max-width: 719px)" />
-<source src="./be-v13.mp4"        type="video/mp4" />
+<source src="./be-v14-mobile.mp4" type="video/mp4" media="(max-width: 719px)" />
+<source src="./be-v14.mp4"        type="video/mp4" />
 ```
 
 Kaynak seçimi bir kez, indirme başlamadan önce yapılır — **telefon geniş dosyayı
@@ -254,107 +264,153 @@ doğru seçim en büyüğü değil, hiçbir durumda kötü olmayanıdır.
 
 ## Bu projenin klipleri — ölçülmüş kararlar
 
-Her iki master da 30 fps ilan ediyordu; ikisi de gerçekte 30 fps değildi ve
-ikisinin de sonunda donmuş bir kuyruk vardı. Ölçümler:
+Güncel klipler **v14** (Eylül 2026 masterları: `_source/be-wide-2026-09.mp4`
+ve `_source/be-mobil-2026-09.mp4`). İkisi de 11 sn; ilk ~5 sn hava çekimi,
+sonrası proje pinlerinin tek tek belirdiği sabit bir kompozisyon. Ölçümler:
 
 | | geniş kadraj | dikey kadraj |
 |---|---|---|
-| kaynak | `be-1.mp4` 1920×1000 | `be-mobil.mp4` 500×900 |
-| gerçek kadans | **24**, temiz kopyalarla 30'a doldurulmuş | **30**, blend'lenmiş 24→30 |
-| ölü kuyruk | 2.96 sn (183. kareden sonra donuk) | 1.33 sn |
-| çıktı | 190 kare · 7.92 sn · 24 fps | 285 kare · 9.50 sn · 30 fps |
-| ayar | crf 20 · GOP 48 · level 4.0 · veryslow | crf 26 · GOP 60 · level 3.1 · veryslow |
-| boyut | 9.28 MB | 1.64 MB |
-| VMAF | 98.16 / tavan **98.56** | 97.28 / tavan **99.65** |
+| kaynak | 1920×1080 · 24 fps · 264 kare · 18 Mbps | 900×1300 · 30 fps · 330 kare · 20 Mbps |
+| gerçek kadans | **24**, temiz — kopya yok | ilk 150 kare: **24**, temiz kopyalarla 30'a doldurulmuş · son 180 kare: gerçek 30 fps'lik kamera hareketi |
+| ölü kuyruk | ~1 sn (son pin 240. karede iner) — **kesilmedi**, bkz. aşağı | yok — pan son kareye kadar yavaşlayarak durur |
+| çıktı | 264 kare · 11.00 sn · 24 fps | 263 kare · 10.96 sn · 24 fps |
+| ayar | crf 16 · GOP 48 · level 4.0 · veryslow | crf 20 · GOP 48 · level 4.0 · veryslow |
+| boyut | 19.62 MB (ilk 5 sn: 14.6 MB) | 6.17 MB (ilk 5 sn: 4.3 MB) |
+| VMAF | 97.94 / tavan **98.93** | 99.90 / tavan **99.98** |
 
-Geniş kadrajın kopyaları temiz olduğu için `decimate=cycle=5` ile ayıklandı.
-Dikey kadrajınkiler **blend'lenmiş** — bilgi karışmış, geri alınamaz — o yüzden
-o klip kendi doğal 30 fps'inde kalıyor.
+**Dikey kadraj iki yarım, iki ayrı işlem.** Kare farkı profili (aşağıdaki
+`tblend` komutu) ilk 150 karede istisnasız her beşinci karede sıfır veriyor:
+24 fps'lik hava çekimi kopyayla 30'a doldurulmuş — `decimate=cycle=5` ile
+120 kareye iniyor. 151. kareden sonra ise sıfır yok; fark önce yükselip sonra
+sıfıra iniyor (ease-in-out): pin kompozisyonu üstünde 30 fps'te render edilmiş
+yumuşak bir pan. Burayı `decimate` ile 24'e indirmek her beşinci karede çift
+adım demek, yavaş bir panda gözle görülür tekleme. `fps=24` de aynı. Onun yerine
+`minterpolate` (mci · aobmc · bidir) ile 24'e dönüştürüldü: düzlemsel bir pan
+hareket kestiriminin en kolay hâli, ara kareler birebir. Sonuçta çıkan farkın
+profili düz (periyodik sıçrama yok), 263 kare. Pinlerin belirdiği karelerde
+tek bir ara kare yarı saydam pin taşıyor (1/24 sn) — algılanmıyor.
 
-**Dikey kadraj crf 26'da, 20'de değil.** 500×900 için crf 20'nin ürettiği
-2.85 Mbps, çözünürlüğe göre çok cömertti (0.21 bit/piksel) ve bir telefonun
-hücresel bağlantısında girişin ortasında donmanın sebebi tam olarak buydu:
-indirme çözücüye yetişemiyor. Ölçüm, aynı ayar setiyle yalnızca crf'yi
-değiştirerek:
+Hava çekiminin kendisi interpolasyona sokulmadı: araçlar, gölgeler ve ince
+bina kenarları hareket kestirimini yanıltır, ve zaten 24'ün 30'a çıkması için
+bir sebep yok — geniş kadraj da 24.
 
-| crf | boyut | VMAF |
-|---|---|---|
-| 20 (eski) | 3.24 MB | 98.75 |
-| 22 | 2.58 MB | 98.39 |
-| 24 | 2.06 MB | 97.93 |
-| **26** | **1.64 MB** | **97.28** |
-| 28 | 1.30 MB | 96.34 |
+**`eq` kaldırması artık yok.** v13'te iki master da koyu gelmişti (ortalama luma
+120) ve kodlamada gamma ile 140'a çekilmişti. v14 masterları zaten 139 ortalama
+lumada; aynı filtreyi uygulamak gökyüzünü patlatırdı. Scrim'ler v13'teki hafif
+hâlinde kaldı.
 
-97'nin üstü telefon ekranında ayırt edilemez; crf 26 dosyayı yarıya indirip
-oradan çıkmıyor. VBV tavanı (`-maxrate`) denendi, aynı boyutta daha düşük
-VMAF verdi — ilk üç saniyenin bayt yoğunluğu klibin en hareketli yerinden
-geliyor ve orayı sıkıştırmak görünür; başlangıçtaki yükü ağ yerine oynatıcı
-karşılıyor (bkz. "Oynatıcı", tamponlu başlangıç). Level 3.1, 4.0 değil: bu
-çözünürlük ve hız 3.1'e sığıyor ve 3.1 en eski telefon donanım çözücülerinin
-bile kabul ettiği seviye.
+**Geniş kadraj crf 16 — pratik tavan.** Tavan 98.93; tam merdiven:
 
-Tavanların 100 olmadığına dikkat: her iki master da zaten ~10 Mbps H.264, yani
-kayıplı. Kalibrasyon yapmadan "98 aldık" cümlesi anlamsız; burada 98.16, tavanın
-**%99.6'sı** demek.
+| crf | boyut | VMAF | tavana |
+|---|---|---|---|
+| 12 | 30.69 MB | 98.27 | −0.66 |
+| 14 | 24.51 MB | 98.11 | −0.82 |
+| **16** | **19.62 MB** | **97.94** | **−0.99** |
+| 18 | 15.66 MB | 97.73 | −1.20 |
+| 20 | 12.41 MB | 97.49 | −1.44 |
+| 22 | 9.74 MB | 97.17 | −1.76 |
 
-**GOP artık 15 değil, 48.** Kısa GOP scrub'ın seek maliyeti içindi; `"hold"`
-modunda klip sürülmüyor, tek seek son kareye ve o da yalnızca ziyaretçi girişi
-atladığında. Ölçüm GOP 48'i hem 240'a hem 24'e tercih ediyor:
+İlk teslim crf 22 idi (v13'ün 9.3 MB bütçesi); "daha kaliteli" isteğiyle
+kademe kademe yukarı alındı ve "tavana çek" denince 12'ye kadar ölçüldü. Eğri
+tavana **hiç ulaşmıyor**: 30 MB'da bile 0.66 puan eksik, çünkü master zaten
+~18 Mbps kayıplı H.264 ve kayıp geri gelmiyor — kalan fark kaynağın, kodlamanın
+değil. 16'nın üstünde her iki crf adımı ~5 MB isteyip 0.17 puan veriyor, yani
+1080p'de bir masaüstü mesafesinden ayırt edilemeyen bir fark için dosya
+yarı yarıya büyüyor. crf 16 bu yüzden pratik tavan.
 
-| | boyut | VMAF |
-|---|---|---|
-| crf 20 · GOP 48 | 9.28 MB | 98.16 |
-| crf 18 · GOP 240 | 10.10 MB | 98.16 |
-| crf 22 · GOP 48 | 8.00 MB | 97.95 |
-| crf 20 · GOP 240 | 8.68 MB | 97.95 |
+Bedeli indirme: baytların %75'i ilk 5 saniyede (23 Mbps, ortalama 14 Mbps).
+Ortalama bir ev bağlantısında sorunsuz; yavaş bir hatta giriş `canplaythrough`
+beklemesine takılırsa ziyaretçi kaydırdığı an klip son kareye atlar (bkz.
+"hold" modu). ~1 saniyelik kuyruk kesilmedi: `"hold"` modunda klip son karede
+duruyor ve o saniye pinlerin okunması için bir nefes; kesmek yalnızca birkaç
+KB kazandırırdı.
 
-Aynı VMAF'ta GOP 48 her seferinde daha küçük: uzun GOP baytı P-zincirine
-harcayıp kaliteyi düşürüyor, çok kısa GOP ise keyframe'e harcıyor. Son kareye
-zorlanmış bir keyframe denendi — %2.9 boyut karşılığı ~50 ms; alınmadı.
+**Dikey kadraj crf 20 — tavan.** Tavan 99.98; tam merdiven:
 
-**Aydınlatma, kodlamada.** İki master da orta parlaklıkta (ortalama luma
-120/255) ve sayfada koyu okunuyordu. Kaldırma `eq` filtresiyle dosyaya
-yazıldı — `gamma=1.18:brightness=0.03:contrast=1.02:saturation=1.03`,
-ortalama luma 120 → 140 — CSS `filter: brightness()` ile değil: tam ekran bir
-videoya filtre, telefonda her karede GPU maliyeti demek, kodlamada ise sıfır.
-Gamma tercih edildi çünkü düz bir `brightness` ofseti gökyüzünü patlatır;
-gamma gölgeleri kaldırıp beyazları yerinde bırakır. Kenar scrim'leri de aynı
-anda hafifletildi (`.film__scrim`), yoksa kodlamanın verdiğinin üçte birini
-geri alıyorlardı.
+| crf | boyut | VMAF | tavana |
+|---|---|---|---|
+| 16 | 10.26 MB | 99.94 | −0.04 |
+| 18 | 7.96 MB | 99.93 | −0.05 |
+| **20** | **6.17 MB** | **99.90** | **−0.08** |
+| 22 | 4.80 MB | 99.78 | −0.20 |
+| 24 | 3.74 MB | 99.47 | −0.51 |
+| 26 | 2.93 MB | 98.74 | −1.24 |
+| 27 | 2.61 MB | 98.23 | −1.75 |
+| 28 | 2.32 MB | 97.52 | −2.46 |
 
-Tekrar üretmek için:
+Burada eğri gerçekten doyuyor: 20'den 16'ya dosya %66 büyüyüp 0.04 puan
+alıyor. crf 20 tavanın 0.08 altında, ölçüm gürültüsü seviyesinde — telefon için
+tavan bu. v13'ün 1.64 MB'ının 3.8 katı ama piksel 2.6 katı (900×1300, 500×900
+değil): üç kat DPR'li bir telefonda `object-fit: cover` bu kaynağı ~2× büyütüyor,
+500 piksellik kaynak 3.5× büyürdü. Ortalama 4.5 Mbps, ilk 5 sn 6.9 Mbps — 4G'de
+sorunsuz, zayıf 3G'de girişin ortasında tamponlama olabilir; oynatıcının
+tamponlu başlangıcı ve kaydırınca son kareye atlaması bunu karşılıyor. Level 3.1 artık yetmiyor (900×1300 = 4674 makroblok, 3.1'in
+tavanı 3600); level 4.0 her 1080p telefonun donanım çözücüsünde var.
+
+**Renk etiketi açık yazıldı.** Geniş master renk bilgisi taşımıyordu
+(`unknown`), dikey bt709 idi. İkisi de bt709 olarak etiketlendi; tarayıcı HD
+için zaten bunu varsayar ama iki dosyanın farklı tahmin edilmesi riski
+sıfırlanmış oldu.
+
+Tekrar üretmek için (önce kayıpsız ara dosya, kodlama ve VMAF onun üstünden):
 
 ```bash
-EQ="eq=gamma=1.18:brightness=0.03:contrast=1.02:saturation=1.03"
+X264="-c:v libx264 -profile:v high -level 4.0 -refs 4 -preset veryslow \
+  -g 48 -keyint_min 48 -sc_threshold 0 -pix_fmt yuv420p \
+  -color_primaries bt709 -color_trc bt709 -colorspace bt709 -movflags +faststart"
 
-# geniş kadraj
-ffmpeg -y -i be-1.mp4 -vf "decimate=cycle=5,$EQ" -frames:v 190 -an \
-  -c:v libx264 -profile:v high -level 4.0 -refs 4 -preset veryslow \
-  -crf 20 -g 48 -keyint_min 48 -sc_threshold 0 -pix_fmt yuv420p \
-  -movflags +faststart public/be-v13.mp4
+# geniş kadraj — kaynak zaten 24 fps
+ffmpeg -y -i _source/be-wide-2026-09.mp4 -an -c:v libx264 -qp 0 -preset ultrafast \
+  -pix_fmt yuv420p -r 24 -fps_mode cfr wide-lossless.mp4
+ffmpeg -y -i wide-lossless.mp4 -an $X264 -crf 16 public/be-v14.mp4
 
-# dikey kadraj
-ffmpeg -y -i be-mobil.mp4 -vf "$EQ" -frames:v 285 -an \
-  -c:v libx264 -profile:v high -level 3.1 -refs 4 -preset veryslow \
-  -crf 26 -g 60 -keyint_min 60 -sc_threshold 0 -pix_fmt yuv420p \
-  -movflags +faststart public/be-v13-mobile.mp4
+# dikey kadraj — ilk 150 kare decimate, kalan pan minterpolate, 24 fps'te birleştir
+ffmpeg -y -i _source/be-mobil-2026-09.mp4 -an -filter_complex \
+  "[0:v]trim=start_frame=0:end_frame=150,setpts=PTS-STARTPTS,decimate=cycle=5[a];
+   [0:v]trim=start_frame=150:end_frame=330,setpts=PTS-STARTPTS,
+        minterpolate=fps=24:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:me=epzs:vsbmc=1[b];
+   [a][b]concat=n=2:v=1:a=0,setpts=N/24/TB[v]" -map "[v]" \
+  -c:v libx264 -qp 0 -preset ultrafast -pix_fmt yuv420p -r 24 -fps_mode cfr mobil-lossless.mp4
+ffmpeg -y -i mobil-lossless.mp4 -an $X264 -crf 20 public/be-v14-mobile.mp4
+
+# VMAF (tavan için kayıpsız dosyayı kendisiyle karşılaştırın)
+ffmpeg -i public/be-v14.mp4 -i wide-lossless.mp4 -lavfi "[0:v][1:v]libvmaf" -f null -
 
 # posterler (ilk kare)
-ffmpeg -y -i public/be-v13.mp4 -vf "select=eq(n\,0),scale=1024:-2" \
+ffmpeg -y -i public/be-v14.mp4 -vf "select=eq(n\,0),scale=1024:-2" \
   -frames:v 1 -q:v 6 public/poster.jpg
-ffmpeg -y -i public/be-v13-mobile.mp4 -vf "select=eq(n\,0),scale=500:-2" \
+ffmpeg -y -i public/be-v14-mobile.mp4 -vf "select=eq(n\,0),scale=720:-2" \
   -frames:v 1 -q:v 6 public/poster-mobile.jpg
 
 # kart görselleri
 for p in be10 be11 be12; do for w in 480 800 1200; do
-  ffmpeg -y -i $p.jpg -vf "scale=$w:-2:flags=lanczos" \
-    -c:v libwebp -quality 86 -compression_level 6 -preset picture \
-    src/assets/projects/$p-$w.webp
+  ffmpeg -y -i $p.jpg -vf "scale=$w:-2:flags=lanczos"     -c:v libwebp -quality 86 -compression_level 6 -preset picture     src/assets/projects/$p-$w.webp
 done; done
 ```
 
 `npm run encode` betiğinin varsayılanları (GOP 15, crf 27, 30 fps) hâlâ
 `"rewind"`/`"forward"` içindir — `"hold"` için yukarıdaki bayrak seti geçerli.
+
+<details>
+<summary>v13 (Ağustos 2026) — önceki masterların ölçümleri</summary>
+
+| | geniş kadraj | dikey kadraj |
+|---|---|---|
+| kaynak | `be-1.mp4` 1920×1000 | `be-mobil.mp4` 500×900 |
+| gerçek kadans | 24, temiz kopyalarla 30'a doldurulmuş | 30, blend'lenmiş 24→30 |
+| ölü kuyruk | 2.96 sn (183. kareden sonra donuk) | 1.33 sn |
+| çıktı | 190 kare · 7.92 sn · 24 fps | 285 kare · 9.50 sn · 30 fps |
+| ayar | crf 20 · GOP 48 · level 4.0 · veryslow | crf 26 · GOP 60 · level 3.1 · veryslow |
+| boyut | 9.28 MB | 1.64 MB |
+| VMAF | 98.16 / tavan 98.56 | 97.28 / tavan 99.65 |
+
+O masterlar koyu geldiği için (ortalama luma 120) kodlamada
+`eq=gamma=1.18:brightness=0.03:contrast=1.02:saturation=1.03` ile 140'a
+çekilmişti; dikey kadrajın 24→30 dönüşümü blend'li olduğu için decimate
+edilemiyor, kendi 30 fps'inde kalıyordu. GOP 48 kararı (48 vs 240 vs 24, aynı
+VMAF'ta en küçük dosya) o klipte ölçüldü ve v14'te de korunuyor.
+
+</details>
 
 ---
 
@@ -564,7 +620,7 @@ açar. Her birine tam bir asset okuması ödemek, girişi mobilde dur-kalk yapan
 `npx wrangler dev`, sonra:
 
 ```bash
-curl -sI -H "Range: bytes=0-1023" http://127.0.0.1:8787/be-v13.mp4
+curl -sI -H "Range: bytes=0-1023" http://127.0.0.1:8787/be-v14.mp4
 # beklenen: HTTP/1.1 206 Partial Content, Content-Range: bytes 0-1023/<boyut>
 ```
 
