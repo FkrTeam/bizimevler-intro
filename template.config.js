@@ -195,7 +195,7 @@ export default {
      `status.tone` maps to a colour: "ready" | "new" | "none".
   -------------------------------------------------------------------- */
   content: {
-    title: "Haydi Gel Bizim'le Ol!",
+    title: "Hayat Bizim'le Güzel",
 
     /**
      * How wide a card photograph actually renders, so the browser can pick a
