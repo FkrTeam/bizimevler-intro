@@ -26,6 +26,20 @@
         "127.0.0.1"
       ],
       "port": 8787
+    },
+    {
+      "name": "preview-split",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "vite",
+        "preview",
+        "--outDir",
+        "dist-intro-r1",
+        "--port",
+        "4182",
+        "--strictPort"
+      ],
+      "port": 4182
     }
   ]
 }

@@ -9,6 +9,7 @@ bağımlılığı** — derleme için sadece Vite.
 npm install
 npm run dev        # http://localhost:5173
 npm run build      # dist/
+npm run build:split  # dist-intro-r1/ — kökte yalnızca index.html, gerisi intro-r1/ içinde
 npm run preview
 npm run encode -- <girdi.mp4> [seçenekler]
 ```
@@ -114,6 +115,18 @@ kopyalayın. `.htaccess` gizli dosyadır — FTP istemcisinde "gizli dosyaları
 göster" açık olmalı, yoksa sessizce atlanır ve cache/MIME kurallarının hiçbiri
 uygulanmaz.
 
+**Bölünmüş yayın (`npm run build:split`).** Web kökünde yalnızca `index.html`
+durabiliyorsa: `dist-intro-r1/` üretilir, belge kökte, diğer her şey (video,
+poster, ikonlar, `assets/`, `.htaccess`) `intro-r1/` altında. Klasör adı
+`template.config.js` → `deploy.assetDir`. Vite göreli base olarak yalnızca
+`./` kabul ettiği için bundle her zamanki gibi derlenir, sonra `index.html`
+bir üst dizine alınıp içindeki `./` URL'leri klasöre çevrilir
+(`hoistIndexPlugin`, `vite.config.js`); `og:image` mutlak olduğu için klasörü
+`renderMeta` yazar. `.htaccess` klasörün içinde kaldığından cache/MIME/range
+kuralları oradaki dosyalara uygulanır; kökteki `index.html` sunucunun kendi
+ayarıyla gider. `robots.txt` ve `sitemap.xml` klasörde işe yaramaz — kökte
+zaten bir tane yoksa elle köke kopyalayın.
+
 Yükledikten sonra üç kontrol:
 
 1. `http://` ile açın — `https://`'e düşmüyorsa `.htaccess`'in başındaki
@@ -172,8 +185,8 @@ Bu daha önce "son kare inmişse seek, inmemişse 3× hızla sona koş" idi. Ko�
 11 saniyelik klipte üç-dört saniye ileri sarma demekti ve o sırada kartlar
 çoktan gelmiş oluyordu — sayfa kaydırmayı reddediyormuş gibi okunuyordu. Seek
 doğru cevap, ama tek şartla: sunucu byte-range yanıtlamalı (bkz. "Sunucu").
-Klibin sonu sabit bir kare olduğu için son GOP küçük — v14'te geniş kadrajda
-0.6 MB, dikeyde 0.25 MB (ölçüldü: son keyframe'den dosya sonuna) — ve o aralık
+Klibin sonu sabit bir kare olduğu için son GOP küçük — v15'te geniş kadrajda
+0.48 MB, dikeyde 0.23 MB (ölçüldü: son keyframe'den dosya sonuna) — ve o aralık
 isteği 4G'de bir saniyenin altında iner. Range vermeyen bir
 sunucuda seek gelmeyecek baytları beklerdi (Safari sonsuza kadar, Chromium
 dosyayı baştan indirerek); o yüzden park seek'inin kendi kısa bekçisi var
@@ -213,8 +226,8 @@ bırakır. Bu yüzden dar ekranlar aynı klibin **yeniden kodlanmışını** de�
 Teslimat `<source media>` ile:
 
 ```html
-<source src="./be-v14-mobile.mp4" type="video/mp4" media="(max-width: 719px)" />
-<source src="./be-v14.mp4"        type="video/mp4" />
+<source src="./be-v15-mobile.mp4" type="video/mp4" media="(max-width: 719px)" />
+<source src="./be-v15.mp4"        type="video/mp4" />
 ```
 
 Kaynak seçimi bir kez, indirme başlamadan önce yapılır — **telefon geniş dosyayı
@@ -264,7 +277,89 @@ doğru seçim en büyüğü değil, hiçbir durumda kötü olmayanıdır.
 
 ## Bu projenin klipleri — ölçülmüş kararlar
 
-Güncel klipler **v14** (Eylül 2026 masterları: `_source/be-wide-2026-09.mp4`
+Güncel klipler **v15** (17 Eylül 2026 masterları: kökteki `desktop.mp4` ve
+`mobile.mp4`, ikisi de ~50 Mbps). İkisi de 11 sn; ilk ~5 sn hava çekimi,
+sonrası proje pinlerinin belirdiği kompozisyon. **120 fps** olarak sevk
+ediliyor; masterlar 24/30 fps olduğu için ara kareler üretildi.
+
+| | geniş kadraj | dikey kadraj |
+|---|---|---|
+| kaynak | 1920×1080 · 24 fps · 264 kare | 900×1300 · 30 fps · 330 kare |
+| çıktı | 1321 kare · 11.01 sn · 120 fps | 1317 kare · 10.98 sn · 120 fps |
+| ayar | crf 22 · GOP 240 · level 5.1 · veryslow | crf 24 · GOP 240 · level 5.0 · veryslow |
+| boyut | 16.57 MB | 6.59 MB |
+| VMAF (kayıpsız 120 fps ara dosyaya karşı) | 94.03 | 94.58 |
+
+**Hava çekimi "temiz 24" değil — kare atılarak 24'e indirilmiş ~30 fps.** Blok
+bazlı faz korelasyonuyla ölçülen kare başına hareket her dördüncü adımda
+(arada bir üçüncüde) iki katına çıkıyor: `… 10.8 9.8 11.1 18.6 …`. 24 fps'te bu
+hafif bir tekleme; 5× interpolasyonla 6 Hz'lik hız dalgalanmasına dönüşürdü.
+Bu yüzden önce gerçek zaman çizgisi kuruldu: normal adım = 1/30 sn (120'lik
+ızgarada 4 tik), çift adım = 8 tik. Dikey masterda aynı çekim ayrıca kopya
+karelerle 30'a doldurulmuş; kopyalar atılınca iki klipte **aynı** kadans çıkıyor
+(30 çift adım, 4-4-4-4-4-4-3 düzeni). `scripts/v15-retime.py`.
+
+**Ara kareler RIFE v4.6 ile** (rife-ncnn-vulkan, 8× üretilip ızgaraya denk
+gelenler seçildi — `scripts/v15-assemble.py`). ffmpeg `minterpolate` dört ayrı
+arama ayarıyla denendi ve açılışta (kare başına 40+ px, perspektif değişimi)
+her seferinde yırtık/bulanık kare üretti. RIFE'ta sabit yapılar keskin kalıyor;
+hyperlapse'te kareden kareye ışınlanan araçlar hayalet bırakıyor, hareket
+bulanıklığı gibi okunuyor.
+
+**Dikey kadrajın pan'ı interpolasyon değil, birebir kaydırma.** Son 183 kare
+bir fotoğrafın üstünde saf öteleme (dört köşede ölçülen kayma aynı). Adım başına
+kayma alt-piksel hassasiyetle artık hata minimize edilerek bulundu, ara kareler
+iki komşu karenin Fourier kaydırmasıyla (sinc — yumuşatma yok) hizalanıp
+çapraz geçişle üretildi. Sonuçta kare farkı profili tamamen düz
+(`2093 2093 2095 2098 …`); RIFE aynı bölümde 30 Hz'lik keskinlik titreşimi,
+`minterpolate` yer yer vektör yuvarlama sıçraması veriyordu. `scripts/v15-pan.py`.
+
+**Geniş kadrajın sabit kuyruğu tutuluyor** (her kaynak kare 5 tik): orada
+hareket yok, interpolasyon yalnızca greni bulandırırdı; kopya kareler x264'te
+neredeyse bedavadır.
+
+**Level 5.1 / 5.0.** 1080p120 = 979 200 MB/sn, level 5.1'in tavanı 983 040;
+900×1300@120 level 5.0'a sığıyor. `-refs 4` korunuyor. GOP 240 (2 sn, v14'teki
+48@24 ile aynı süre) + `-force_key_frames 10.5`: `"hold"` modunun son kareye
+park seek'i en fazla 60 kare çözer ve son GOP küçük kalır (geniş 0.48 MB,
+dikey 0.23 MB). Önizleme sunucusunda iki klip de 3 sn'de ~362 kare, 0 düşen
+kareyle oynadı. 60 Hz ekranda tarayıcı her ikinci kareyi gösterir — 120/60 tam
+bölündüğü için kadans yine düzgün.
+
+**crf seçimi boyuta göre.** 120 fps'te kare başına VMAF, 24 fps'teki kadar
+anlam taşımıyor (her kare 8 ms ekranda). Geniş: crf 19 → 25.08 MB / 96.23 ·
+**22 → 16.57 MB / 94.03** · 25 → 10.90 MB / 90.61. Dikey: crf 22 → 8.59 MB /
+96.76 · **24 → 6.59 MB / 94.58** · 26 → 5.08 MB / 91.56. Geniş kadraj v14 ile
+aynı ağırlıkta tutuldu; dikey 1.8 MB büyüdü.
+
+Tekrar üretmek için (çalışma klasöründe; RIFE ayrı indirilir):
+
+```bash
+ffmpeg -i desktop.mp4 -an -fps_mode passthrough d/%04d.png
+ffmpeg -i mobile.mp4  -an -fps_mode passthrough m/%04d.png
+python scripts/v15-retime.py desktop.mp4 960 540  d 120 none      # → d.json
+python scripts/v15-retime.py mobile.mp4  900 1300 m 148 interp4   # → m.json
+# d.json / m.json içindeki "keep" karelerini d_in/ m_in/ altına 0000.png… diye kopyalayın
+rife-ncnn-vulkan -g 1 -m rife-v4.6 -i d_in -o d_out -n 960    # kare sayısı × 8
+rife-ncnn-vulkan -g 1 -m rife-v4.6 -i m_in -o m_out -n 944
+python scripts/v15-pan.py            # → pan_syn.mkv (dikey pan, 729 kare)
+python scripts/v15-assemble.py       # → d120.ffconcat, m120.ffconcat
+
+CM="scale=out_color_matrix=bt709:out_range=tv:flags=accurate_rnd+full_chroma_int,format=yuv420p"
+ffmpeg -f concat -safe 0 -i d120.ffconcat -vf "fps=120,$CM" -frames:v 1321   -c:v libx264 -qp 0 -preset ultrafast d120-lossless.mp4
+# dikey: m120.ffconcat'in yalnızca m_out satırları (588 kare) + pan_syn.mkv, concat filtresiyle
+
+X264="-c:v libx264 -profile:v high -refs 4 -preset veryslow -g 240 -keyint_min 240   -sc_threshold 0 -force_key_frames 10.5 -pix_fmt yuv420p -color_primaries bt709   -color_trc bt709 -colorspace bt709 -color_range tv -movflags +faststart"
+ffmpeg -i d120-lossless.mp4 -an $X264 -level 5.1 -crf 22 public/be-v15.mp4
+ffmpeg -i m120-lossless.mp4 -an $X264 -level 5.0 -crf 24 public/be-v15-mobile.mp4
+```
+
+Posterler yeni masterların ilk karesinden yeniden üretildi (1024 / 720 px, `-q:v 6`).
+
+<details>
+<summary>v14 (Eylül 2026 başı) — 24 fps sevkiyatın ölçümleri</summary>
+
+Klipler **v14** (Eylül 2026 masterları: `_source/be-wide-2026-09.mp4`
 ve `_source/be-mobil-2026-09.mp4`). İkisi de 11 sn; ilk ~5 sn hava çekimi,
 sonrası proje pinlerinin tek tek belirdiği sabit bir kompozisyon. Ölçümler:
 
@@ -391,6 +486,9 @@ done; done
 
 `npm run encode` betiğinin varsayılanları (GOP 15, crf 27, 30 fps) hâlâ
 `"rewind"`/`"forward"` içindir — `"hold"` için yukarıdaki bayrak seti geçerli.
+
+
+</details>
 
 <details>
 <summary>v13 (Ağustos 2026) — önceki masterların ölçümleri</summary>
@@ -621,7 +719,7 @@ açar. Her birine tam bir asset okuması ödemek, girişi mobilde dur-kalk yapan
 `npx wrangler dev`, sonra:
 
 ```bash
-curl -sI -H "Range: bytes=0-1023" http://127.0.0.1:8787/be-v14.mp4
+curl -sI -H "Range: bytes=0-1023" http://127.0.0.1:8787/be-v15.mp4
 # beklenen: HTTP/1.1 206 Partial Content, Content-Range: bytes 0-1023/<boyut>
 ```
 

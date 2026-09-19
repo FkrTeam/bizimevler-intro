@@ -1,19 +1,22 @@
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { defineConfig } from "vite";
 
 import config from "./template.config.js";
 
 /* ---------------------------------------------------------------------------
-   Content injection
+   Split deploy (`npm run build:split`)
 
-   The cards, masthead, video element and copy are written into index.html at
-   BUILD time rather than rendered by the browser. That keeps the template
-   data-driven without giving up the thing this page has been careful about
-   throughout: the markup ships complete, so no-JS visitors, crawlers and
-   reduced-motion users all get real content.
-
-   enforce: "pre" so the asset URLs this emits still go through Vite's own
-   asset pipeline and come out hashed.
+   For a host where only index.html may sit in the web root and everything else
+   has to live in one folder beside it (template.config.js → deploy.assetDir).
+   Vite only accepts "./" as a relative base, so the bundle is built exactly as
+   usual into that folder; afterwards the document is lifted one level up and
+   its "./" URLs are pointed into the folder. The stylesheet and script resolve
+   their own URLs against themselves, so nothing inside them changes.
+   Empty string = the ordinary flat dist/.
 --------------------------------------------------------------------------- */
+let ASSET_DIR = "";
 
 const esc = (s) =>
   String(s)
@@ -128,7 +131,12 @@ function renderContent(content) {
    the canonical is dropped, since a relative canonical says nothing. */
 function renderMeta(p) {
   const origin = p.url ? p.url.replace(/\/+$/, "/") : null;
-  const abs = (path) => (origin ? origin + path.replace(/^\.?\//, "") : path);
+  /* Absolute, so the split deploy's folder has to be written in here — the
+     "./" rewrite in hoistIndexPlugin never sees this URL. */
+  const abs = (path) =>
+    origin
+      ? origin + (ASSET_DIR ? `${ASSET_DIR}/` : "") + path.replace(/^\.?\//, "")
+      : path;
 
   return [
     `<link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png" />`,
@@ -308,11 +316,40 @@ function templatePlugin() {
   };
 }
 
-export default defineConfig({
+/* Lifts index.html out of the asset folder once the bundle is written and
+   points its document-relative URLs ("./x" in an attribute, a srcset list or a
+   url()) into the folder it just left. */
+function hoistIndexPlugin(outRoot) {
+  return {
+    name: "hoist-index",
+    apply: "build",
+    closeBundle() {
+      const from = resolve(outRoot, ASSET_DIR, "index.html");
+      const html = readFileSync(from, "utf8")
+        .replace(/(["'(,\s])\.\//g, `$1./${ASSET_DIR}/`)
+        // Vite writes the inline <style>'s poster as a bare url("poster.jpg").
+        .replace(
+          /url\((["']?)(?![./#]|[a-z]+:)/gi,
+          `url($1./${ASSET_DIR}/`
+        );
+      writeFileSync(resolve(outRoot, "index.html"), html);
+      rmSync(from);
+    },
+  };
+}
+
+export default defineConfig(({ mode }) => {
+  ASSET_DIR =
+    mode === "split"
+      ? (config.deploy?.assetDir ?? "").replace(/^\/+|\/+$/g, "")
+      : "";
+  const outRoot = ASSET_DIR ? `dist-${ASSET_DIR}` : "dist";
+
+  return {
   // Relative base so dist/ works from any subpath, not just the domain root.
   base: "./",
 
-  plugins: [templatePlugin()],
+  plugins: [templatePlugin(), ...(ASSET_DIR ? [hoistIndexPlugin(outRoot)] : [])],
 
   server: {
     port: 5173,
@@ -321,7 +358,7 @@ export default defineConfig({
 
   build: {
     target: "es2020",
-    outDir: "dist",
+    outDir: ASSET_DIR ? `${outRoot}/${ASSET_DIR}` : outRoot,
     sourcemap: false,
     // Emit every asset as a hashed file instead of inlining the small ones.
     // Inlined assets land inside index.html, which is served no-cache, so a
@@ -329,4 +366,5 @@ export default defineConfig({
     // in the immutable cache. Consistency is worth one extra request.
     assetsInlineLimit: 0,
   },
+};
 });

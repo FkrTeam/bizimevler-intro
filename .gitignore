@@ -3,11 +3,14 @@ node_modules/
 
 # Build output
 dist/
+dist-*/
 
 # Raw / working media (large source assets, not needed by the site)
 _source/
 /be*.mp4
 /be*.jpg
+/desktop.mp4
+/mobile.mp4
 
 # OS / editor
 .DS_Store

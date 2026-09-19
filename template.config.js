@@ -19,17 +19,19 @@ export default {
      fps drives the seek tolerance, and the dimensions reserve the layout box.
   -------------------------------------------------------------------- */
   video: {
-    src: "./be-v14.mp4",
+    src: "./be-v15.mp4",
     poster: "./poster.jpg",
     width: 1920,
     height: 1080,
     /**
-     * 24, the master's native rate this time: the v14 wide master arrived as
-     * clean 24 fps (no padded duplicates), so it ships frame for frame.
+     * 120. The masters are 24/30 fps; the in-between frames are synthesised
+     * (RIFE for the aerial footage, after undoing the dropped-frame cadence the
+     * master carries; the still tail is held). See README "Bu projenin
+     * klipleri".
      */
-    fps: 24,
+    fps: 120,
     /** Seconds. Only used to size the scroll runway. */
-    duration: 11,
+    duration: 11.008,
     /**
      * Intro playback speed. The clip plays once at this rate before scroll
      * takes over. 1 = as encoded. Raising it shortens the wait before the
@@ -57,14 +59,15 @@ export default {
        `media` is also what the poster and aspect tokens are emitted
        under, so the breakpoint lives in exactly one place.
 
-       Same 24 fps as the wide cut. The v14 portrait master was 30 fps in
-       two halves: the aerial footage padded 24→30 with clean duplicates
-       (dropped with `decimate`), then a rendered 30 fps camera move over
-       the pin composition (converted with motion interpolation, which is
-       exact for a planar pan). See README "Bu projenin klipleri".
+       Same 120 fps as the wide cut. The portrait master is 30 fps in two
+       halves: the aerial footage padded 24→30 with clean duplicates
+       (dropped, then interpolated like the wide cut), then a rendered
+       30 fps pan over the pin composition — a pure translation, so its
+       in-between frames are exact sub-pixel shifts rather than estimates.
+       See README "Bu projenin klipleri".
     ------------------------------------------------------------------ */
     portrait: {
-      src: "./be-v14-mobile.mp4",
+      src: "./be-v15-mobile.mp4",
       poster: "./poster-mobile.jpg",
       width: 900,
       height: 1300,
@@ -271,6 +274,16 @@ export default {
       //   meta: "Ispartakule",
       // },
     ],
+  },
+
+  /* --------------------------------------------------------------------
+     DEPLOY
+     `npm run build:split` writes dist-<assetDir>/ with index.html at its root
+     and every other file inside <assetDir>/ — for a web root that may only
+     take the document itself. `npm run build` ignores this and stays flat.
+  -------------------------------------------------------------------- */
+  deploy: {
+    assetDir: "intro-r1",
   },
 
   /* --------------------------------------------------------------------

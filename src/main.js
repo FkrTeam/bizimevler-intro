@@ -56,11 +56,24 @@ function ensureCut() {
   const p = videoCfg.portrait;
   if (!p || typeof matchMedia !== "function") return;
 
-  const want = matchMedia(p.media).matches ? p.src : videoCfg.src;
-  const name = (url) => url.split("/").pop().split("?")[0];
-  if (video.currentSrc && name(video.currentSrc) === name(want)) return;
+  /* The URL comes from the markup, not from the config. The config's "./x.mp4"
+     is only right while the document sits beside the file; the split deploy
+     (index.html in the web root, everything else in a folder) rewrites the
+     <source> URLs at build time, and `source.src` reads back already resolved
+     against the document. Taking the config's path here sent the player to
+     /x.mp4 — a 404, which the player could only report as refused autoplay.
 
-  for (const source of video.querySelectorAll("source")) source.remove();
+     That path is not an iOS-only one either: with the script coming out of
+     the cache it can run before resource selection has finished, `currentSrc`
+     is still empty, and the replacement below happens on every browser. */
+  const sources = [...video.querySelectorAll("source")];
+  const pick = matchMedia(p.media).matches
+    ? sources.find((s) => s.media)
+    : sources.find((s) => !s.media);
+  const want = pick?.src;
+  if (!want || video.currentSrc === want) return;
+
+  for (const source of sources) source.remove();
   video.src = want;
 }
 
