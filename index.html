@@ -41,36 +41,27 @@
     %POSTER_PRELOAD%
 
     <!--
-      Runs before first paint. Adds .js-anim ONLY when the user has not asked
-      for reduced motion. Everything is visible by default in CSS; this class
-      is what hands visibility over to the scroll-driven properties. Result: no
-      JS, no JS error, no crawler and no reduced-motion user ever sees an empty
-      page.
+      Runs before first paint. Adds .js-anim so the scroll-driven sequence
+      can take over visibility. Everything is visible by default in CSS, so
+      no JS, a JS error or a crawler never sees an empty page. The OS
+      "reduce motion" preference is deliberately ignored: on Windows it is
+      set by the generic "show animations" switch, which users toggle for
+      unrelated reasons, and the fallback layout it produced read as broken.
     -->
     <script>
       (function () {
-        try {
-          if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
-            document.documentElement.classList.add("js-anim");
+        document.documentElement.classList.add("js-anim");
 
-            /* The section is one timed sequence, not a document you hold your
-               place in: the clip plays, then scroll brings the content up over
-               it. Restoring the scroll position drops the visitor into the
-               middle of that sequence — no intro, no hint, and the composition
-               already resolved. So the page is asked to open where the
-               sequence does. Set here rather than in the module so
-               it lands before the browser has restored anything, which is what
-               keeps the reload from flashing the bottom of the section first.
-
-               Only under .js-anim: with reduced motion nothing is pinned or
-               scrubbed, the page is an ordinary document, and holding the
-               reader's place is the right behaviour there. */
-            if ("scrollRestoration" in history) {
-              history.scrollRestoration = "manual";
-            }
-          }
-        } catch (e) {
-          /* matchMedia unsupported — leave content visible */
+        /* The section is one timed sequence, not a document you hold your
+           place in: the clip plays, then scroll brings the content up over
+           it. Restoring the scroll position drops the visitor into the
+           middle of that sequence — no intro, no hint, and the composition
+           already resolved. So the page is asked to open where the
+           sequence does. Set here rather than in the module so
+           it lands before the browser has restored anything, which is what
+           keeps the reload from flashing the bottom of the section first. */
+        if ("scrollRestoration" in history) {
+          history.scrollRestoration = "manual";
         }
       })();
     </script>

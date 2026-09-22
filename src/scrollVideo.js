@@ -1,5 +1,4 @@
 import { clamp, damp } from "./utils/math.js";
-import { prefersReducedMotion } from "./utils/motionPrefs.js";
 
 /**
  * Scroll-driven video. Zero dependencies, no knowledge of the project using
@@ -781,17 +780,6 @@ export function initScrollVideo({
     video.removeEventListener("seeked", markSettled);
     video.removeEventListener("ended", beginScrub);
     video.removeEventListener("ended", onIntroEnded);
-  }
-
-  /* ---- Reduced motion ----------------------------------------------------
-     No autoplay, no scrubbing, no loop. The poster stands in and everything
-     the scroll would have revealed is visible from the start.
-  ------------------------------------------------------------------------ */
-
-  if (prefersReducedMotion()) {
-    observer.disconnect();
-    onScrubProgress?.(1);
-    return { destroy };
   }
 
   if (REWIND) {

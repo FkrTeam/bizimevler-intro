@@ -98,7 +98,7 @@ src/
 ├── debug.js              ← ?debug ölçüm paneli
 ├── styles/{tokens,main}.css
 ├── assets/
-└── utils/{math,motionPrefs}.js
+└── utils/math.js
 ```
 
 ---
@@ -671,9 +671,10 @@ hâlde klip boyunca her karede compositor'a boşa bir tik.
 
 ## Erişilebilirlik
 
-- `prefers-reduced-motion: reduce`: otomatik oynatma yok, scrub yok, döngü
-  başlamıyor. Poster duruyor ve kaydırmanın açacağı her şey baştan görünür.
-  Uzun koşu mesafesi tek ekrana iniyor, yoksa ölü kaydırma olurdu.
+- `prefers-reduced-motion` bilerek dikkate alınmıyor. Windows'ta bu sinyali
+  genel "animasyonları göster" anahtarı üretiyor; kullanıcılar onu alakasız
+  sebeplerle kapatıyor ve eski statik yedek düzen bozuk görünüyordu. Site her
+  durumda aynı akışla açılıyor.
 - **İçerik JavaScript olmadan görünür.** CSS'te varsayılan görünür; gizli
   başlangıç durumu yalnızca `<head>` içindeki satır içi script'in eklediği
   `.js-anim` sınıfı altında devreye giriyor.
