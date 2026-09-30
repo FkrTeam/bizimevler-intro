@@ -304,6 +304,27 @@ ul {
   border: 1px solid rgb(255 255 255 / 0.16);
   background: color-mix(in srgb, var(--bg) 44%, transparent);
   /* No text-shadow, by request. */
+  /* A link to the cards, so it has to look pressable without turning into a
+     button: the plate's hairline brightens on hover, nothing else moves. */
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 240ms var(--ease-out), color 240ms var(--ease-out);
+}
+
+.film__prompt-text:hover {
+  color: #fff;
+  border-color: rgb(255 255 255 / 0.5);
+}
+
+.film__prompt-text:focus-visible {
+  outline: 2px solid var(--brand-yellow);
+  outline-offset: 3px;
+}
+
+/* Hidden for the intro and faded out near the cards: no target either way. */
+.js-anim .film__prompt:not(.is-active) .film__prompt-text,
+.film__prompt.is-faded .film__prompt-text {
+  pointer-events: none;
 }
 
 /* The blur is attached to the active state only, for the same reason the
@@ -650,7 +671,7 @@ ul {
 
 .card__logo {
   display: block;
-  width: 118px;
+  width: 150px;
   height: auto;
   /* The plate is already a solid blue rectangle — it needs no frame, and by
      request no shadow either. */
@@ -664,25 +685,19 @@ ul {
   align-items: center;
   gap: 0.7em;
   font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.16em;
+  font-size: 0.86rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--text) 62%, transparent);
+  /* Full white, by request: at 62% grey the line was hard to read. */
+  color: #fff;
 }
 
 .card__sep {
   width: 1px;
-  height: 10px;
+  height: 12px;
   background: currentColor;
-  opacity: 0.4;
-}
-
-.card__status--ready {
-  color: var(--status-ready);
-}
-
-.card__status--new {
-  color: var(--brand-yellow);
+  opacity: 0.5;
 }
 
 /* The single moving part. Draws itself across the foot of the card on hover —
@@ -731,7 +746,21 @@ ul {
   }
 
   .card__logo {
-    width: 108px;
+    width: 132px;
+  }
+
+  /* At the larger size the line no longer fits beside a 42% photo, so status
+     and place stack instead of wrapping mid-label. */
+  .card__meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35em;
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+  }
+
+  .card__sep {
+    display: none;
   }
 }
 
@@ -752,7 +781,7 @@ ul {
   }
 
   .card__logo {
-    width: 100px;
+    width: 124px;
   }
 }
 

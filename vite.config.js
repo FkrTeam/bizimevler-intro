@@ -38,7 +38,7 @@ function renderPrompt(text) {
      the travelling hint is a pseudo-element, and this span is the scroll's own
      position filling the same groove once the hint retires. See main.css. */
   return `<p class="film__prompt" data-scroll-prompt>
-            <span class="film__prompt-text">${esc(text)}</span>
+            <a class="film__prompt-text" href="#projects" data-prompt-link>${esc(text)}</a>
             <span class="film__prompt-line" aria-hidden="true">
               <span class="film__prompt-fill"></span>
             </span>

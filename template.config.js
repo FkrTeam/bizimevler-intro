@@ -176,8 +176,9 @@ export default {
     alt: "Bizim Evler",
   },
 
-  /** Scroll hint. Set to null to omit it. */
-  prompt: "Keşfetmek için kaydırın",
+  /** Scroll hint. Also a link: clicking it scrolls to the cards. Set to null
+   *  to omit it. */
+  prompt: "Devam eden projeler",
 
   /** Shown in the hint's place when the browser refuses to autoplay the
    *  intro (Opera Mobile does, iOS in Low Power Mode does) — the visitor has
@@ -228,7 +229,7 @@ export default {
             1200: "/src/assets/projects/be12-1200.webp",
           },
           width: 1200,
-          height: 676,
+          height: 672,
         },
         logo: { src: "/src/assets/projects/be12logo.png", width: 308, height: 93 },
         status: { label: "Yeni proje", tone: "new" },
@@ -246,7 +247,7 @@ export default {
             1200: "/src/assets/projects/be11-1200.webp",
           },
           width: 1200,
-          height: 776,
+          height: 674,
         },
         logo: { src: "/src/assets/projects/be11logo.png", width: 308, height: 93 },
         status: { label: "Taşınmaya hazır", tone: "ready" },

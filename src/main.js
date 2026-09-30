@@ -168,6 +168,9 @@ function onScrubProgress(progress) {
     if (fade !== lastPromptFade) {
       lastPromptFade = fade;
       prompt.style.setProperty("--prompt-fade", String(fade));
+      // The hint is a link; once it has mostly faded it must stop catching
+      // clicks, or the visitor hits an invisible target over the footage.
+      prompt.classList.toggle("is-faded", fade < 0.3);
     }
   }
 
@@ -220,6 +223,27 @@ function restorePrompt() {
   prompt.classList.remove("is-tap");
   if (promptText) promptText.textContent = promptDefault;
 }
+
+/* ---------------------------------------------------------------------------
+   The hint as a shortcut
+
+   Clicking it scrolls to the point where the cards have fully arrived — not
+   to #projects, which sits inside the pinned section and would leave the
+   page wherever the anchor jump happened to land. The scroll itself is what
+   skips the intro, exactly as a manual one would. While the hint is asking
+   for a tap instead, the click belongs to the autoplay retry.
+--------------------------------------------------------------------------- */
+
+prompt?.querySelector("[data-prompt-link]")?.addEventListener("click", (e) => {
+  e.preventDefault();
+  if (prompt.classList.contains("is-tap")) return;
+  const travel = section.offsetHeight - innerHeight;
+  const end = timing.contentReveal?.[1] ?? 1;
+  scrollTo({
+    top: section.offsetTop + travel * end,
+    behavior: "smooth",
+  });
+});
 
 initScrollVideo({
   video,
