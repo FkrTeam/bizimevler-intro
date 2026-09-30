@@ -201,15 +201,15 @@ export default {
     /**
      * How wide a card photograph actually renders, so the browser can pick a
      * width from `photo.srcset` before it knows the layout. Read it against
-     * main.css: below 720px the card turns on its side and the photo takes
-     * 42% of it; above that the row is two columns inside a 54rem container,
+     * main.css: below 720px the photo spans the card, nearly the full
+     * viewport; above that the row is two columns inside a 54rem container,
      * so each one is (viewport − padding − gap) / 2 until the container caps.
      *
      * These are the render widths, not the file widths — the browser
      * multiplies by the device pixel ratio itself. A 410px slot on a 2× screen
      * asks for 820px and gets the 1200.
      */
-    photoSizes: "(max-width: 719px) 44vw, (max-width: 919px) 46vw, 410px",
+    photoSizes: "(max-width: 719px) 92vw, (max-width: 919px) 46vw, 410px",
 
     items: [
       {

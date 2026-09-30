@@ -639,7 +639,9 @@ ul {
      beats aspect-ratio — without this the three photos render at their own
      intrinsic heights (588px vs 450px) and the cards stop matching. */
   height: auto;
-  aspect-ratio: 3 / 2;
+  /* The renders are 16:9 (1200×674 / 1200×672), so the frame matches them and
+     the whole picture shows — a 3:2 frame was cutting the sides off. */
+  aspect-ratio: 16 / 9;
   object-fit: cover;
   /* Architectural renders put the subject above the horizon; favouring the
      upper half keeps towers in frame instead of paving. */
@@ -723,34 +725,24 @@ ul {
    Two places it would otherwise overflow:
 --------------------------------------------------------------------------- */
 
-/* Narrow: stacked portrait cards cannot fit a phone screen, so the card
-   turns on its side. Same parts, laid horizontally. With two cards rather
-   than three there is room to let the photograph and the logo breathe a
-   little; the row still clears a 640px-tall phone with the title above it. */
+/* Narrow: the photo keeps the full card width so the whole 16:9 render shows
+   (a square beside the caption cropped away more than half of it), and the
+   caption turns into one row under it — logo left, status and place right.
+   Two cards this shape still clear a 640px-tall phone with the title above. */
 @media (max-width: 719px) {
-  .card {
-    flex-direction: row;
-  }
-
-  .card__photo {
-    flex: none;
-    width: 42%;
-    aspect-ratio: 1 / 1;
-  }
-
   .card__content {
-    flex: 1;
-    justify-content: center;
-    gap: 0.65rem;
-    padding: var(--space-md);
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
   }
 
   .card__logo {
-    width: 132px;
+    width: 124px;
   }
 
-  /* At the larger size the line no longer fits beside a 42% photo, so status
-     and place stack instead of wrapping mid-label. */
+  /* Stacked beside the logo rather than wrapping mid-label. */
   .card__meta {
     flex-direction: column;
     align-items: flex-start;
@@ -769,10 +761,6 @@ ul {
   .film__cards-title {
     font-size: clamp(1.4rem, 3.4vw, 2.1rem);
     margin-bottom: var(--space-md);
-  }
-
-  .card__photo {
-    aspect-ratio: 16 / 9;
   }
 
   .card__content {
