@@ -109,6 +109,14 @@
         animation: none !important;
       }
 
+      /* The two buttons appear together. Exairon only shows its launcher
+         after fetching the channel config and opening its socket, a beat
+         after the WhatsApp button is ready, so the WhatsApp button waits
+         for it (see the script at the end of <body>). */
+      html:not(.contact-ready) .fwm-fab {
+        visibility: hidden;
+      }
+
       #whatsapp-info-bubble {
         position: fixed;
         right: calc(var(--contact-r) + var(--contact-btn) + 16px);
@@ -298,17 +306,50 @@
       const bubble = document.getElementById("whatsapp-info-bubble");
       const close = document.getElementById("whatsapp-info-close");
 
+      /* Resolves on the frame Exairon's launcher becomes visible, or after
+         `timeout` ms so the WhatsApp button still shows if Exairon is slow
+         or down. Polled rather than observed: the launcher button is drawn
+         inside its own iframe, out of reach of a MutationObserver on this
+         document. setTimeout, not requestAnimationFrame, so a tab opened in
+         the background is not left waiting for the full timeout. */
+      const exaironShown = (timeout) =>
+        new Promise((resolve) => {
+          const deadline = setTimeout(resolve, timeout);
+          const check = () => {
+            const frame = document.getElementById("exw-launcher-frame");
+            if (
+              frame &&
+              frame.getClientRects().length > 0 &&
+              frame.contentDocument?.querySelector(".exw-launcher")
+            ) {
+              clearTimeout(deadline);
+              resolve();
+            } else {
+              setTimeout(check, 30);
+            }
+          };
+          check();
+        });
+
+      let showTimer;
       let hideTimer;
+      let dismissed = false;
 
-      const showTimer = setTimeout(() => {
-        bubble.classList.add("visible");
+      exaironShown(8000).then(() => {
+        document.documentElement.classList.add("contact-ready");
+        if (dismissed) return;
 
-        hideTimer = setTimeout(() => {
-          bubble.classList.remove("visible");
-        }, 8000);
-      }, 1000);
+        showTimer = setTimeout(() => {
+          bubble.classList.add("visible");
+
+          hideTimer = setTimeout(() => {
+            bubble.classList.remove("visible");
+          }, 8000);
+        }, 1000);
+      });
 
       const dismiss = () => {
+        dismissed = true;
         clearTimeout(showTimer);
         clearTimeout(hideTimer);
         bubble.classList.remove("visible");
