@@ -30,6 +30,145 @@
     -->
     <link rel="stylesheet" href="/src/styles/main.css" />
 
+    <!-- WhatsApp floating button. Version pinned so an upstream release
+         cannot change the live page unannounced. -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/@tavosud/floating-button-whatsapp-modern@1.0.8/dist/floating-button-whatsapp-modern.css"
+    />
+    <style>
+      /* Contact stack, bottom-right: the Exairon live-chat launcher keeps its
+         own corner (its iframe is anchored by the vendor script, and its chat
+         window opens from there), the WhatsApp button sits directly above it
+         on the same axis, and the info bubble stands to the left of both,
+         centred on the pair. Exairon's visible circle is 60px, inset 35px
+         from the right and 25px from the bottom inside its 80px frame;
+         everything else is derived from those numbers. */
+      :root {
+        --contact-r: 35px; /* both buttons' right edge */
+        --contact-b: 25px; /* Exairon circle's bottom edge */
+        --contact-btn: 60px; /* both buttons are 60px circles */
+        --contact-gap: 14px; /* between the two circles */
+        --contact-wa-b: calc(var(--contact-b) + var(--contact-btn) + var(--contact-gap));
+        /* vertical centre of the two-button stack */
+        --contact-mid: calc(var(--contact-b) + var(--contact-btn) + var(--contact-gap) / 2);
+      }
+
+      /* Phones (Exairon decides by user agent, see .ua-mobi below): the
+         channel's server config puts the launcher bottom-LEFT with no margin,
+         which would split the two buttons across the screen. While the chat
+         is closed, pull its container back to the right and lift it off the
+         edge; once open it goes full screen and is left alone. Its circle
+         then sits 20px from the right and 15px from the bottom. Setting the
+         mobile position to "right" in the Exairon panel would make the
+         container override unnecessary. */
+      .ua-mobi {
+        --contact-r: 20px;
+        --contact-b: 15px;
+      }
+
+      .exw-widget-container-left:not(.exw-chat-open) {
+        left: auto !important;
+        right: 5px !important;
+        bottom: 10px !important;
+        /* Exairon animates `all`; without this the launcher visibly slides
+           back from the full-screen chat's edges each time it is closed. */
+        transition: none !important;
+      }
+
+      .exw-widget-container-left:not(.exw-chat-open) > div {
+        left: auto !important;
+        right: 0 !important;
+      }
+
+      /* The widget positions itself through these custom properties, set
+         per instance on #fwm-<id>; !important is what lets a class rule
+         override an id rule's custom property. */
+      .fwm-widget {
+        --fwm-fab-r: var(--contact-r) !important;
+        --fwm-fab-b: var(--contact-wa-b) !important;
+        --fwm-pop-r: var(--contact-r) !important;
+        --fwm-pop-b: calc(var(--contact-wa-b) + var(--contact-btn) + 10px) !important;
+      }
+
+      /* The page declares color-scheme: dark; Exairon's iframes are light
+         documents, and a scheme mismatch makes the browser paint an iframe's
+         background opaque — a white square behind the round launcher.
+         Matching the scheme on the frame element keeps it transparent. */
+      #exaironWebchat iframe {
+        color-scheme: light;
+      }
+
+      /* Keep Exairon's launcher still. It carries an attention bounce that
+         repeats every 3s (.exw-animated .exw-bounce), and on hover the
+         script drops those classes, which restarts the frame's base
+         "slide-in" animation — starting from opacity 0, so the button
+         blinks out on every hover. Switching off animation on the frame
+         itself, whatever its classes, stops both. */
+      #exw-launcher-frame {
+        animation: none !important;
+      }
+
+      #whatsapp-info-bubble {
+        position: fixed;
+        right: calc(var(--contact-r) + var(--contact-btn) + 16px);
+        bottom: var(--contact-mid);
+        z-index: 2147483646;
+        max-width: 265px;
+        padding: 15px 35px 15px 17px;
+        background: #ffffff;
+        color: #333333;
+        border: 1px solid #eeeeee;
+        border-radius: 13px;
+        box-shadow: 0 5px 25px rgba(0, 0, 0, 0.12);
+        font: 14px/1.5 Arial, sans-serif;
+        opacity: 0;
+        visibility: hidden;
+        /* 50% puts the bubble's own centre on --contact-mid */
+        transform: translate(10px, 50%);
+        transition: opacity 0.3s, transform 0.3s, visibility 0.3s;
+      }
+
+      #whatsapp-info-bubble.visible {
+        opacity: 1;
+        visibility: visible;
+        transform: translate(0, 50%);
+      }
+
+      /* Arrow on the right edge, pointing between the two buttons */
+      #whatsapp-info-bubble::after {
+        content: "";
+        position: absolute;
+        top: calc(50% - 6px);
+        right: -7px;
+        width: 12px;
+        height: 12px;
+        background: white;
+        border-top: 1px solid #eeeeee;
+        border-right: 1px solid #eeeeee;
+        transform: rotate(45deg);
+      }
+
+      #whatsapp-info-close {
+        position: absolute;
+        top: 6px;
+        right: 9px;
+        background: transparent;
+        border: 0;
+        color: #999;
+        font-size: 19px;
+        cursor: pointer;
+      }
+
+      @media (max-width: 600px) {
+        #whatsapp-info-bubble {
+          max-width: 200px;
+          padding: 12px 30px 12px 14px;
+          font-size: 13px;
+        }
+      }
+    </style>
+
     <!--
       The poster is a CSS background, so the request for it cannot start until
       the stylesheet above has been fetched and parsed — which is exactly the
@@ -94,5 +233,90 @@
     </main>
 
     <script type="module" src="/src/main.js"></script>
+
+    <!-- Start of Exairon.Messenger Script -->
+    <script id="exairon-messenger-script">
+      /* Same phone test Exairon itself uses to pick its mobile layout, set
+         here (synchronously, before first paint) so the contact stack's
+         offsets are right from the start instead of jumping once the
+         vendor script arrives. */
+      if (/Mobi/.test(navigator.userAgent)) {
+        document.documentElement.classList.add("ua-mobi");
+      }
+
+      !(function () {
+        let e = document.createElement("script"),
+          t = document.head || document.getElementsByTagName("head")[0];
+        (e.id = "exairon-messenger"),
+          (e.src = "https://ihlasyapi.services.exairon.com/assets/widget/index.js"),
+          (e.async = !0),
+          (e.onload = () => {
+            window.WebChat.default(
+              {
+                customData: { language: "tr" },
+                socketPath: "/socket/",
+                channelId: "6ae9e63027b983023b6bc865",
+                withRules: true,
+                hideWhenNotConnected: false,
+                displayType: "livechat",
+              },
+              null,
+            );
+          }),
+          t.insertBefore(e, t.firstChild);
+      })();
+    </script>
+    <!-- End of Exairon.Messenger Script -->
+
+    <div id="whatsapp-info-bubble" role="status">
+      <button id="whatsapp-info-close" type="button" aria-label="Mesajı kapat">×</button>
+      Projemiz hakkında bilgi almak için <br />
+      <strong>Bize ulaşın.</strong>
+    </div>
+
+    <script type="module">
+      import { createWhatsAppButton } from "https://unpkg.com/@tavosud/floating-button-whatsapp-modern@1.0.8/dist/index.esm.js";
+
+      createWhatsAppButton({
+        phone: "902124051000",
+        name: "Bizim Evler",
+        slogan: "",
+        message: "Merhaba, proje hakkında bilgi almak istiyorum",
+        sendButtonLabel: "Mesaj Gönder",
+      });
+
+      /* The library hard-codes its screen-reader labels in Spanish and has no
+         option for them; translate them once the widget is in the DOM. */
+      for (const [selector, label] of [
+        [".fwm-fab", "WhatsApp sohbetini aç"],
+        [".fwm-close-btn", "Kapat"],
+        [".fwm-popup", "WhatsApp sohbeti"],
+      ]) {
+        document.querySelector(selector)?.setAttribute("aria-label", label);
+      }
+
+      const bubble = document.getElementById("whatsapp-info-bubble");
+      const close = document.getElementById("whatsapp-info-close");
+
+      let hideTimer;
+
+      const showTimer = setTimeout(() => {
+        bubble.classList.add("visible");
+
+        hideTimer = setTimeout(() => {
+          bubble.classList.remove("visible");
+        }, 8000);
+      }, 1000);
+
+      const dismiss = () => {
+        clearTimeout(showTimer);
+        clearTimeout(hideTimer);
+        bubble.classList.remove("visible");
+      };
+
+      close.addEventListener("click", dismiss);
+      /* Once a visitor opens the WhatsApp chat the bubble has done its job. */
+      document.querySelector(".fwm-fab")?.addEventListener("click", dismiss);
+    </script>
   </body>
 </html>
